@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE, messagesFor } from './messages.js';
 import { fold } from './text.js';
 import { dayKey, formatDay, formatTime, localParts } from './time.js';
 
@@ -6,13 +7,13 @@ export const MORNING_HOUR = 7;
 
 const KIND_PRIORITY = ['SOON', 'MORNING', 'PUBLISHED'];
 
-export function matchedWatches(closure, watches) {
+export function matchedWatches(closure, watches, lang = DEFAULT_LANGUAGE) {
   const haystack = ` ${fold(closure.text)} `;
   const labels = [];
   for (const watch of watches) {
     if (watch.kind === 'ZONE') {
       if (watch.value === closure.zone) {
-        labels.push(`Zona ${watch.value}`);
+        labels.push(messagesFor(lang).zone(watch.value));
       }
     } else {
       const needle = fold(watch.value);
@@ -40,26 +41,28 @@ function dueKinds(closure, sent, now) {
   return kinds;
 }
 
-function buildMessage(kind, closure, labels, now) {
+function buildMessage(kind, closure, labels, now, lang) {
+  const messages = messagesFor(lang);
   const window = `${formatTime(closure.start)}–${formatTime(closure.end)}`;
   const where = labels.join(', ');
+  const zone = messages.zone(closure.zone);
   if (kind === 'SOON') {
     const minutes = Math.round((closure.start - now) / 60000);
-    return { title: `Voda nestaje za oko ${minutes} min`, body: `${window} (Zona ${closure.zone}) – ${where}` };
+    return { title: messages.soon(minutes), body: `${window} (${zone}) – ${where}` };
   }
   if (kind === 'MORNING') {
-    return { title: 'Danas nema vode', body: `${window} (Zona ${closure.zone}) – ${where}` };
+    return { title: messages.morning, body: `${window} (${zone}) – ${where}` };
   }
-  return { title: `Plan redukcije ${formatDay(closure.start)} ${window}`, body: `Zona ${closure.zone} – ${where}` };
+  return { title: messages.published(formatDay(closure.start), window), body: `${zone} – ${where}` };
 }
 
-export function planNotifications({ closures, watches, sent, now }) {
+export function planNotifications({ closures, watches, sent, now, lang = DEFAULT_LANGUAGE }) {
   const notifications = [];
   for (const closure of closures) {
     if (closure.end <= now) {
       continue;
     }
-    const labels = matchedWatches(closure, watches);
+    const labels = matchedWatches(closure, watches, lang);
     const kinds = labels.length > 0 ? dueKinds(closure, sent, now) : [];
     if (kinds.length === 0) {
       continue;
@@ -69,7 +72,7 @@ export function planNotifications({ closures, watches, sent, now }) {
       closureId: closure.id,
       tag: `${closure.id}-${kind}`,
       markSent: kinds.map(dueKind => `${closure.id}|${dueKind}`),
-      ...buildMessage(kind, closure, labels, now),
+      ...buildMessage(kind, closure, labels, now, lang),
     });
   }
   return notifications;

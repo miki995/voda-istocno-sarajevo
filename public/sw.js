@@ -9,7 +9,7 @@ self.addEventListener('push', event => {
       tag: message.tag,
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      lang: 'bs',
+      lang: message.lang === 'en' ? 'en' : 'sr',
     }),
   );
 });

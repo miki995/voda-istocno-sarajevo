@@ -1,7 +1,7 @@
 {
   "name": "voda-istocno-sarajevo",
   "version": "1.0.0",
-  "description": "Obavjestenja o nestanku vode u Istocnom Sarajevu",
+  "description": "Water outage alerts for Istocno Sarajevo",
   "directories": {
     "test": "test"
   },

@@ -1,5 +1,6 @@
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import { mergePlacesByZone, parsePlan } from './parser.js';
+import { normalizeLanguage } from './messages.js';
 import { planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
 import zonesSeed from './zones-seed.json' with { type: 'json' };
@@ -91,6 +92,7 @@ async function notifySubscriber(store, env, plan, now, id) {
     watches: record.watches,
     sent: record.sent,
     now,
+    lang: record.lang,
   });
   let delivered = 0;
   for (const notification of notifications) {
@@ -98,6 +100,7 @@ async function notifySubscriber(store, env, plan, now, id) {
       title: notification.title,
       body: notification.body,
       tag: notification.tag,
+      lang: normalizeLanguage(record.lang),
     }).catch(() => null);
     if (response?.status === 404 || response?.status === 410) {
       await store.del(subKey(id));
@@ -132,14 +135,14 @@ export async function runCron(store, env, now = Date.now()) {
   return { closures: plan.closures.length, delivered, planError };
 }
 
-export async function saveSubscription(store, subscription, rawWatches) {
+export async function saveSubscription(store, subscription, rawWatches, lang) {
   const watches = sanitizeWatches(rawWatches);
   const id = await subscriptionId(subscription.endpoint);
   const existing = await store.get(subKey(id));
   const plan = await loadPlan(store);
   const alreadyKnown = plan.closures.map(closure => `${closure.id}|PUBLISHED`);
   const sent = [...new Set([...(existing?.sent ?? []), ...alreadyKnown])];
-  await store.set(subKey(id), { subscription, watches, sent });
+  await store.set(subKey(id), { subscription, watches, sent, lang: normalizeLanguage(lang) });
   await store.sadd(SUBS_SET, id);
   return watches;
 }

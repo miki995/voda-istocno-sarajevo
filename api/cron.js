@@ -15,12 +15,12 @@ function isAuthorized(req) {
 
 export default async function handler(req, res) {
   if (!isAuthorized(req)) {
-    return sendJson(res, 401, { error: 'Neovlašteno' });
+    return sendJson(res, 401, { error: 'Unauthorized' });
   }
   try {
     return sendJson(res, 200, await runCron(getStore(), process.env));
   } catch (error) {
     console.error('cron failed', error.message);
-    return sendJson(res, 500, { error: 'Greška servera' });
+    return sendJson(res, 500, { error: 'Server error' });
   }
 }

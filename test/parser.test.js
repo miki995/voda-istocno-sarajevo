@@ -82,6 +82,31 @@ describe('matching and notifications', () => {
     assert.deepEqual(result[0].markSent.sort(), [`${plan.closures[1].id}|MORNING`, `${plan.closures[1].id}|PUBLISHED`, `${plan.closures[1].id}|SOON`].sort());
   });
 
+  it('writes the notification in English when asked to', () => {
+    const now = localEpoch(2026, 10, 21, 9, 0);
+    const [notification] = planNotifications({
+      closures: plan.closures,
+      watches: [{ kind: 'ZONE', value: 'III' }],
+      sent: [],
+      now,
+      lang: 'en',
+    });
+    assert.match(notification.title, /Water cuts off in about 90 min/);
+    assert.match(notification.body, /Zone III/);
+  });
+
+  it('falls back to Serbian for an unknown language', () => {
+    const now = localEpoch(2026, 10, 21, 9, 0);
+    const [notification] = planNotifications({
+      closures: plan.closures,
+      watches: [{ kind: 'ZONE', value: 'III' }],
+      sent: [],
+      now,
+      lang: 'de',
+    });
+    assert.match(notification.body, /Zona III/);
+  });
+
   it('does not repeat a notification', () => {
     const now = localEpoch(2026, 10, 21, 9, 0);
     const closure = plan.closures[1];

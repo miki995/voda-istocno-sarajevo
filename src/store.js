@@ -61,7 +61,7 @@ export function getStore(env = process.env) {
   if (url && token) {
     cached = redisStore(new Redis({ url, token }));
   } else if (env.VERCEL) {
-    throw new Error('Redis nije podešen');
+    throw new Error('Redis is not configured');
   } else {
     cached = memoryStore();
   }

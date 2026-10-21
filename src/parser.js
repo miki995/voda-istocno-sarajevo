@@ -119,7 +119,7 @@ export function mergePlacesByZone(existing, closures) {
         known.set(fold(place), place);
       }
     }
-    merged[closure.zone] = [...known.values()].sort((first, second) => first.localeCompare(second, 'bs'));
+    merged[closure.zone] = [...known.values()].sort((first, second) => first.localeCompare(second, 'sr-Latn'));
   }
   return merged;
 }

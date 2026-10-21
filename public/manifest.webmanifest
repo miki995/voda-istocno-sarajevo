@@ -4,7 +4,7 @@
   "description": "Obavještenja o nestanku vode u Istočnom Sarajevu",
   "start_url": "/",
   "display": "standalone",
-  "lang": "bs",
+  "lang": "sr-Latn",
   "background_color": "#0b5fa5",
   "theme_color": "#0b5fa5",
   "icons": [

@@ -1,29 +1,23 @@
+import { LANGUAGES, applyStaticTexts, formatDayLabel, getLanguage, setLanguage, t } from './i18n.js';
+
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
 
-const WEEKDAYS = ['nedjelja', 'ponedjeljak', 'utorak', 'srijeda', 'četvrtak', 'petak', 'subota'];
-
 const timeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const dayPartsFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'numeric' });
-const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-const dayFormat = {
-  format(epochMs) {
-    const parts = Object.fromEntries(dayPartsFormat.formatToParts(new Date(epochMs)).map(part => [part.type, part.value]));
-    return `${WEEKDAYS[WEEKDAY_INDEX[parts.weekday]]}, ${parts.day}.${parts.month}.`;
-  },
-};
 
 const state = {
   watches: loadWatches(),
   plan: { fetchedAt: 0, status: '', closures: [] },
   zonePlaces: {},
   subscription: null,
+  alertsMessage: '',
+  planLoadFailed: false,
 };
 
 const nodes = {
   updated: document.getElementById('updated'),
+  languageSwitch: document.getElementById('language-switch'),
   alertsText: document.getElementById('alerts-text'),
   alertsToggle: document.getElementById('alerts-toggle'),
   alertsHint: document.getElementById('alerts-hint'),
@@ -80,6 +74,10 @@ function watchKey(watch) {
   return watch.kind === 'ZONE' ? `ZONE:${watch.value}` : `PLACE:${fold(watch.value)}`;
 }
 
+function watchLabel(watch) {
+  return watch.kind === 'ZONE' ? t('zone', { zone: watch.value }) : watch.value;
+}
+
 function hasWatch(kind, value) {
   const key = watchKey({ kind, value });
   return state.watches.some(watch => watchKey(watch) === key);
@@ -109,11 +107,24 @@ function closureMatches(closure) {
   });
 }
 
+function renderLanguageSwitch() {
+  nodes.languageSwitch.replaceChildren(
+    ...LANGUAGES.map(lang =>
+      el('button', {
+        text: lang.toUpperCase(),
+        className: 'lang-btn',
+        attrs: { type: 'button', 'aria-pressed': String(getLanguage() === lang), lang },
+        onClick: () => changeLanguage(lang),
+      }),
+    ),
+  );
+}
+
 function renderZonePicker() {
   nodes.zonePicker.replaceChildren(
     ...ZONE_NAMES.map(zone =>
       el('button', {
-        text: `Zona ${zone}`,
+        text: t('zone', { zone }),
         className: 'zone-btn',
         attrs: { type: 'button', 'aria-pressed': String(hasWatch('ZONE', zone)) },
         onClick: () => toggleWatch('ZONE', zone),
@@ -127,10 +138,10 @@ function renderWatchList() {
   nodes.watchList.replaceChildren(
     ...state.watches.map(watch =>
       el('li', { className: 'chip' }, [
-        el('span', { text: watch.kind === 'ZONE' ? `Zona ${watch.value}` : watch.value }),
+        el('span', { text: watchLabel(watch) }),
         el('button', {
           text: '×',
-          attrs: { type: 'button', 'aria-label': `Ukloni ${watch.value}` },
+          attrs: { type: 'button', 'aria-label': t('watch.remove', { name: watchLabel(watch) }) },
           onClick: () => toggleWatch(watch.kind, watch.value),
         }),
       ]),
@@ -139,17 +150,16 @@ function renderWatchList() {
 }
 
 function formatWindow(closure) {
-  const startDay = dayFormat.format(closure.start);
-  const endsAnotherDay = dayFormat.format(closure.end) !== startDay;
-  const end = timeFormat.format(closure.end);
-  return `${timeFormat.format(closure.start)} – ${end}${endsAnotherDay ? ' (sutradan)' : ''}`;
+  const endsAnotherDay = formatDayLabel(closure.end) !== formatDayLabel(closure.start);
+  const suffix = endsAnotherDay ? ` (${t('plan.nextDay')})` : '';
+  return `${timeFormat.format(closure.start)} – ${timeFormat.format(closure.end)}${suffix}`;
 }
 
 function renderClosures() {
   const now = Date.now();
   const visible = state.plan.closures.filter(closure => closure.end > now - 6 * 60 * 60 * 1000);
   if (visible.length === 0) {
-    nodes.closures.replaceChildren(el('p', { text: 'Trenutno nema objavljenog plana redukcije.', className: 'muted' }));
+    nodes.closures.replaceChildren(el('p', { text: t('plan.none'), className: 'muted' }));
     return;
   }
   nodes.closures.replaceChildren(
@@ -157,15 +167,15 @@ function renderClosures() {
       const mine = closureMatches(closure);
       const live = closure.start <= now && closure.end > now;
       const past = closure.end <= now;
-      const badges = [el('span', { text: `Zona ${closure.zone}`, className: 'badge' })];
-      if (live) badges.push(el('span', { text: 'traje sada', className: 'badge live' }));
-      if (mine) badges.push(el('span', { text: 'tvoja ulica', className: 'badge mine' }));
+      const badges = [el('span', { text: t('zone', { zone: closure.zone }), className: 'badge' })];
+      if (live) badges.push(el('span', { text: t('plan.live'), className: 'badge live' }));
+      if (mine) badges.push(el('span', { text: t('plan.mine'), className: 'badge mine' }));
       return el('article', { className: `closure${mine ? ' mine' : ''}${past ? ' past' : ''}` }, [
         el('div', { className: 'closure-head' }, [
           el('span', { text: formatWindow(closure), className: 'closure-time' }),
           el('span', { className: 'row' }, badges),
         ]),
-        el('p', { text: dayFormat.format(closure.start), className: 'muted' }),
+        el('p', { text: formatDayLabel(closure.start), className: 'muted' }),
         el('ul', {}, closure.lines.map(line => el('li', { text: line }))),
       ]);
     }),
@@ -173,13 +183,14 @@ function renderClosures() {
 }
 
 function renderZones() {
+  const openZones = new Set([...nodes.zones.querySelectorAll('details[open]')].map(details => details.dataset.zone));
   nodes.zones.replaceChildren(
     ...ZONE_NAMES.map(zone => {
       const places = state.zonePlaces[zone] ?? [];
-      const details = el('details', { className: 'zone-block' }, [
+      const details = el('details', { className: 'zone-block', attrs: { 'data-zone': zone } }, [
         el('summary', {}, [
-          el('span', { text: `Zona ${zone}` }),
-          el('span', { text: `${places.length} mjesta`, className: 'count' }),
+          el('span', { text: t('zone', { zone }) }),
+          el('span', { text: t('zones.count', { count: places.length }), className: 'count' }),
         ]),
         el(
           'div',
@@ -194,26 +205,33 @@ function renderZones() {
           ),
         ),
       ]);
+      details.open = openZones.has(zone);
       return details;
     }),
   );
 }
 
 function renderUpdated() {
+  if (state.planLoadFailed) {
+    nodes.updated.textContent = t('plan.loadFailed');
+    return;
+  }
   if (!state.plan.fetchedAt) {
-    nodes.updated.textContent = 'Plan još nije učitan.';
+    nodes.updated.textContent = t('header.loading');
     return;
   }
   const label = state.plan.status ? `${state.plan.status} · ` : '';
-  nodes.updated.textContent = `${label}ažurirano ${timeFormat.format(state.plan.fetchedAt)}`;
+  nodes.updated.textContent = `${label}${t('plan.updated', { time: timeFormat.format(state.plan.fetchedAt) })}`;
 }
 
 function renderAll() {
+  renderLanguageSwitch();
   renderUpdated();
   renderZonePicker();
   renderWatchList();
   renderClosures();
   renderZones();
+  renderAlertsState();
 }
 
 function allSuggestions(query) {
@@ -240,8 +258,8 @@ function renderSuggestions() {
   const items = allSuggestions(query);
   const typed = query.trim();
   const showTyped = fold(typed).length >= 3 && !items.some(item => fold(item.place) === fold(typed));
-  const rows = items.map(item => ({ value: item.place, tag: `Zona ${item.zone}` }));
-  if (showTyped) rows.push({ value: typed, tag: 'dodaj kako si ukucao' });
+  const rows = items.map(item => ({ value: item.place, tag: t('zone', { zone: item.zone }) }));
+  if (showTyped) rows.push({ value: typed, tag: t('watch.addTyped') });
   activeSuggestion = -1;
   nodes.suggestions.hidden = rows.length === 0;
   nodes.suggestions.replaceChildren(
@@ -305,32 +323,37 @@ function urlBase64ToBytes(value) {
 function renderAlertsState() {
   nodes.alertsHint.hidden = true;
   if (isIosBrowserTab()) {
-    nodes.alertsText.textContent = 'Na iPhoneu obavještenja rade tek kad sajt dodaš na početni ekran.';
-    nodes.alertsHint.textContent = 'Safari → dugme Podijeli → "Dodaj na početni ekran", pa otvori sajt odatle i uključi obavještenja.';
+    nodes.alertsText.textContent = t('alerts.ios');
+    nodes.alertsHint.textContent = t('alerts.iosHint');
     nodes.alertsHint.hidden = false;
     nodes.alertsToggle.hidden = true;
     return;
   }
   if (!pushSupported()) {
-    nodes.alertsText.textContent = 'Ovaj preglednik ne podržava obavještenja. Plan i dalje možeš pratiti na ovoj stranici.';
+    nodes.alertsText.textContent = t('alerts.unsupported');
     nodes.alertsToggle.hidden = true;
     return;
   }
   if (Notification.permission === 'denied') {
-    nodes.alertsText.textContent = 'Obavještenja su blokirana u postavkama preglednika. Dozvoli ih za ovaj sajt pa osvježi stranicu.';
+    nodes.alertsText.textContent = t('alerts.blocked');
     nodes.alertsToggle.hidden = true;
     return;
   }
   nodes.alertsToggle.hidden = false;
   if (state.subscription) {
-    nodes.alertsText.textContent = 'Obavještenja su uključena na ovom uređaju.';
-    nodes.alertsToggle.textContent = 'Isključi obavještenja';
+    nodes.alertsText.textContent = state.alertsMessage || t('alerts.active');
+    nodes.alertsToggle.textContent = t('alerts.disable');
     nodes.alertsToggle.classList.remove('primary');
   } else {
-    nodes.alertsText.textContent = 'Uključi obavještenja da ti poruka stigne i kad stranica nije otvorena.';
-    nodes.alertsToggle.textContent = 'Uključi obavještenja';
+    nodes.alertsText.textContent = state.alertsMessage || t('alerts.inactive');
+    nodes.alertsToggle.textContent = t('alerts.enable');
     nodes.alertsToggle.classList.add('primary');
   }
+}
+
+function showAlertsMessage(key) {
+  state.alertsMessage = key ? t(key) : '';
+  renderAlertsState();
 }
 
 async function postJson(url, body) {
@@ -345,9 +368,13 @@ async function postJson(url, body) {
 async function syncSubscription() {
   if (!state.subscription) return;
   try {
-    await postJson('/api/subscribe', { subscription: state.subscription.toJSON(), watches: state.watches });
+    await postJson('/api/subscribe', {
+      subscription: state.subscription.toJSON(),
+      watches: state.watches,
+      lang: getLanguage(),
+    });
   } catch {
-    nodes.alertsText.textContent = 'Nisam uspio sačuvati izbor na serveru. Pokušaj ponovo.';
+    showAlertsMessage('alerts.saveFailed');
   }
 }
 
@@ -378,14 +405,23 @@ async function disableAlerts() {
 
 nodes.alertsToggle.addEventListener('click', async () => {
   nodes.alertsToggle.disabled = true;
+  state.alertsMessage = '';
   try {
     await (state.subscription ? disableAlerts() : enableAlerts());
   } catch {
-    nodes.alertsText.textContent = 'Nešto nije uspjelo pri uključivanju obavještenja. Pokušaj ponovo.';
+    showAlertsMessage('alerts.failed');
   } finally {
     nodes.alertsToggle.disabled = false;
   }
 });
+
+function changeLanguage(lang) {
+  setLanguage(lang);
+  state.alertsMessage = '';
+  applyStaticTexts();
+  renderAll();
+  syncSubscription();
+}
 
 async function loadData() {
   const [plan, zonePlaces] = await Promise.all([
@@ -394,20 +430,28 @@ async function loadData() {
   ]);
   state.plan = plan;
   state.zonePlaces = zonePlaces;
+  state.planLoadFailed = false;
   renderAll();
 }
 
+function loadDataQuietly() {
+  return loadData().catch(() => {
+    state.planLoadFailed = state.plan.fetchedAt === 0;
+    renderUpdated();
+  });
+}
+
 async function init() {
+  applyStaticTexts();
   renderAll();
-  renderAlertsState();
-  await loadData().catch(() => { nodes.updated.textContent = 'Ne mogu da učitam plan. Pokušaj kasnije.'; });
+  await loadDataQuietly();
   if (pushSupported() && !isIosBrowserTab()) {
     const registration = await navigator.serviceWorker.register('/sw.js');
     state.subscription = await registration.pushManager.getSubscription();
     renderAlertsState();
     syncSubscription();
   }
-  setInterval(() => loadData().catch(() => undefined), 5 * 60 * 1000);
+  setInterval(loadDataQuietly, 5 * 60 * 1000);
 }
 
 init();

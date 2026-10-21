@@ -46,7 +46,7 @@ createServer(async (req, res) => {
     const file = join(root, 'api', `${name}.js`);
     if (!existsSync(file)) {
       res.statusCode = 404;
-      return res.end('{"error":"Nepoznata putanja"}');
+      return res.end('{"error":"Unknown path"}');
     }
     req.body = await readJson(req);
     const { default: handler } = await import(pathToFileURL(file).href);

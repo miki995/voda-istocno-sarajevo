@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="bs">
+<html lang="sr-Latn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,50 +13,55 @@
 </head>
 <body>
   <header class="top">
-    <h1>Voda · Istočno Sarajevo</h1>
-    <p id="updated" class="muted">Učitavam plan…</p>
+    <div class="top-row">
+      <h1 data-i18n="header.title">Voda · Istočno Sarajevo</h1>
+      <div id="language-switch" class="lang-switch" role="group" data-i18n-label="header.language" aria-label="Jezik"></div>
+    </div>
+    <p id="updated" class="muted" data-i18n="header.loading">Učitavam plan…</p>
   </header>
 
   <main>
     <section class="card" aria-labelledby="alerts-title">
-      <h2 id="alerts-title">Obavještenja</h2>
+      <h2 id="alerts-title" data-i18n="alerts.title">Obavještenja</h2>
       <p id="alerts-text" class="muted"></p>
       <div class="row">
-        <button id="alerts-toggle" class="btn primary" type="button">Uključi obavještenja</button>
+        <button id="alerts-toggle" class="btn primary" type="button" data-i18n="alerts.enable">Uključi obavještenja</button>
       </div>
       <p id="alerts-hint" class="hint" hidden></p>
     </section>
 
     <section class="card" aria-labelledby="watch-title">
-      <h2 id="watch-title">Moje ulice i zone</h2>
-      <p class="muted">Dobijaš poruku čim se plan objavi, ujutro na dan zatvaranja i oko 2 sata prije nego voda nestane.</p>
+      <h2 id="watch-title" data-i18n="watch.title">Moje ulice i zone</h2>
+      <p class="muted" data-i18n="watch.help">Dobijaš poruku čim se plan objavi, ujutru na dan zatvaranja i oko 2 sata prije nego što voda nestane.</p>
 
       <div class="search">
-        <label class="sr-only" for="search-input">Pretraži ulicu ili naselje</label>
-        <input id="search-input" type="search" inputmode="search" autocomplete="off" autocapitalize="off" placeholder="Ukucaj ulicu ili naselje…">
+        <label class="sr-only" for="search-input" data-i18n="watch.searchLabel">Pretraži ulicu ili naselje</label>
+        <input id="search-input" type="search" inputmode="search" autocomplete="off" autocapitalize="off" placeholder="Ukucaj ulicu ili naselje…" data-i18n-placeholder="watch.placeholder">
         <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
       </div>
 
-      <div class="zone-picker" id="zone-picker" role="group" aria-label="Izaberi cijelu zonu"></div>
+      <div class="zone-picker" id="zone-picker" role="group" data-i18n-label="watch.zoneGroup" aria-label="Izaberi cijelu zonu"></div>
 
       <ul id="watch-list" class="chips" aria-live="polite"></ul>
-      <p id="watch-empty" class="muted">Još ništa nije izabrano.</p>
+      <p id="watch-empty" class="muted" data-i18n="watch.empty">Još ništa nije izabrano.</p>
     </section>
 
     <section class="card" aria-labelledby="today-title">
-      <h2 id="today-title">Plan redukcije</h2>
+      <h2 id="today-title" data-i18n="plan.title">Plan redukcije</h2>
       <div id="closures"></div>
     </section>
 
     <section class="card" aria-labelledby="zones-title">
-      <h2 id="zones-title">Šta pripada kojoj zoni</h2>
-      <p class="muted">Spisak se dopunjuje iz svakog objavljenog plana. Dodirni ulicu da je dodaš.</p>
+      <h2 id="zones-title" data-i18n="zones.title">Šta pripada kojoj zoni</h2>
+      <p class="muted" data-i18n="zones.help">Spisak se dopunjuje iz svakog objavljenog plana. Dodirni ulicu da je dodaš.</p>
       <div id="zones"></div>
     </section>
   </main>
 
   <footer class="foot muted">
-    Izvor: <a href="https://vikis.info/" rel="noopener">vikis.info</a> · neslužbeni servis, provjeri i kod vodovoda.
+    <span data-i18n="footer.source">Izvor:</span>
+    <a href="https://vikis.info/" rel="noopener">vikis.info</a> ·
+    <span data-i18n="footer.disclaimer">neslužbeni servis, provjeri i kod vodovoda.</span>
   </footer>
 
   <script src="/app.js" type="module"></script>
