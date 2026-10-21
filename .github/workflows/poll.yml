@@ -18,4 +18,7 @@ jobs:
         env:
           SITE_URL: ${{ secrets.SITE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: curl --fail --silent --show-error --max-time 60 -H "Authorization: Bearer $CRON_SECRET" "$SITE_URL/api/cron"
+        run: |
+          curl --fail --silent --show-error --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron"
