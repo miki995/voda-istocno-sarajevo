@@ -1,4 +1,4 @@
-import { LANGUAGES, applyStaticTexts, formatDayLabel, getLanguage, setLanguage, t } from './i18n.js';
+import { LANGUAGES, applyStaticTexts, formatDayLabel, formatRelativeDay, getLanguage, setLanguage, t } from './i18n.js';
 
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
@@ -98,13 +98,21 @@ function afterWatchesChanged() {
   syncSubscription();
 }
 
+function watchMatchesClosure(watch, closure) {
+  if (watch.kind === 'ZONE') return watch.value === closure.zone;
+  const needle = fold(watch.value);
+  return needle.length >= 3 && ` ${fold(closure.text)} `.includes(needle);
+}
+
 function closureMatches(closure) {
-  const haystack = ` ${fold(closure.text)} `;
-  return state.watches.some(watch => {
-    if (watch.kind === 'ZONE') return watch.value === closure.zone;
-    const needle = fold(watch.value);
-    return needle.length >= 3 && haystack.includes(needle);
-  });
+  return state.watches.some(watch => watchMatchesClosure(watch, closure));
+}
+
+function upcomingClosuresFor(watch) {
+  const now = Date.now();
+  return state.plan.closures
+    .filter(closure => closure.end > now && watchMatchesClosure(watch, closure))
+    .sort((first, second) => first.start - second.start);
 }
 
 function renderLanguageSwitch() {
@@ -135,17 +143,33 @@ function renderZonePicker() {
 
 function renderWatchList() {
   nodes.watchEmpty.hidden = state.watches.length > 0;
+  const now = Date.now();
   nodes.watchList.replaceChildren(
-    ...state.watches.map(watch =>
-      el('li', { className: 'chip' }, [
-        el('span', { text: watchLabel(watch) }),
-        el('button', {
-          text: '×',
-          attrs: { type: 'button', 'aria-label': t('watch.remove', { name: watchLabel(watch) }) },
-          onClick: () => toggleWatch(watch.kind, watch.value),
-        }),
-      ]),
-    ),
+    ...state.watches.map(watch => {
+      const upcoming = upcomingClosuresFor(watch);
+      const schedule = upcoming.length === 0
+        ? [el('li', { text: t('watch.noClosure'), className: 'watch-none' })]
+        : upcoming.map(closure =>
+            el('li', { className: closure.start <= now ? 'watch-live' : '' }, [
+              el('strong', { text: formatRelativeDay(closure.start) }),
+              el('span', { text: ` · ${formatWindow(closure)}` }),
+              ...(watch.kind === 'ZONE' ? [] : [el('span', { text: ` · ${t('zone', { zone: closure.zone })}` })]),
+              ...(closure.start <= now ? [el('span', { text: t('plan.live'), className: 'badge live' })] : []),
+            ]),
+          );
+      return el('li', { className: 'watch-item' }, [
+        el('div', { className: 'watch-head' }, [
+          el('span', { text: watchLabel(watch), className: 'watch-name' }),
+          el('button', {
+            text: '×',
+            className: 'watch-remove',
+            attrs: { type: 'button', 'aria-label': t('watch.remove', { name: watchLabel(watch) }) },
+            onClick: () => toggleWatch(watch.kind, watch.value),
+          }),
+        ]),
+        el('ul', { className: 'watch-schedule' }, schedule),
+      ]);
+    }),
   );
 }
 

@@ -28,6 +28,9 @@ const DICTIONARY = {
     'watch.empty': 'Još ništa nije izabrano.',
     'watch.remove': 'Ukloni {name}',
     'watch.addTyped': 'dodaj kako si ukucao',
+    'watch.noClosure': 'Nema objavljenog zatvaranja u trenutnom planu.',
+    'day.today': 'Danas',
+    'day.tomorrow': 'Sutra',
     'plan.title': 'Plan redukcije',
     'plan.none': 'Trenutno nema objavljenog plana redukcije.',
     'plan.live': 'traje sada',
@@ -68,6 +71,9 @@ const DICTIONARY = {
     'watch.empty': 'Nothing selected yet.',
     'watch.remove': 'Remove {name}',
     'watch.addTyped': 'add as typed',
+    'watch.noClosure': 'No closure in the currently published plan.',
+    'day.today': 'Today',
+    'day.tomorrow': 'Tomorrow',
     'plan.title': 'Outage plan',
     'plan.none': 'No outage plan is currently published.',
     'plan.live': 'in progress',
@@ -126,6 +132,16 @@ export function formatDayLabel(epochMs) {
   if (currentLanguage === 'en') return englishDayFormat.format(epochMs);
   const parts = Object.fromEntries(dayPartsFormat.formatToParts(new Date(epochMs)).map(part => [part.type, part.value]));
   return `${WEEKDAYS_SR[WEEKDAY_INDEX[parts.weekday]]}, ${parts.day}.${parts.month}.`;
+}
+
+const dayKeyFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function formatRelativeDay(epochMs, nowMs = Date.now()) {
+  const key = dayKeyFormat.format(epochMs);
+  if (key === dayKeyFormat.format(nowMs)) return t('day.today');
+  if (key === dayKeyFormat.format(nowMs + DAY_MS)) return t('day.tomorrow');
+  return formatDayLabel(epochMs);
 }
 
 export function applyStaticTexts() {
