@@ -3,8 +3,14 @@ import { LANGUAGES, applyStaticTexts, formatDayLabel, formatRelativeDay, getLang
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
+const SCREENS = ['home', 'menu', 'add', 'alerts', 'plan', 'zones'];
 
 const timeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+const ICONS = {
+  drop: '<path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.4 0z"/>',
+  bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+};
 
 const state = {
   watches: loadWatches(),
@@ -13,10 +19,17 @@ const state = {
   subscription: null,
   alertsMessage: '',
   planLoadFailed: false,
+  openDetails: new Set(),
 };
 
 const nodes = {
+  screens: [...document.querySelectorAll('[data-screen]')],
   updated: document.getElementById('updated'),
+  homeBanner: document.getElementById('home-banner'),
+  homeContent: document.getElementById('home-content'),
+  menuButton: document.getElementById('menu-button'),
+  menuAddValue: document.getElementById('menu-add-value'),
+  menuAlertsValue: document.getElementById('menu-alerts-value'),
   languageSwitch: document.getElementById('language-switch'),
   alertsText: document.getElementById('alerts-text'),
   alertsToggle: document.getElementById('alerts-toggle'),
@@ -26,6 +39,7 @@ const nodes = {
   zonePicker: document.getElementById('zone-picker'),
   watchList: document.getElementById('watch-list'),
   watchEmpty: document.getElementById('watch-empty'),
+  addDone: document.getElementById('add-done'),
   closures: document.getElementById('closures'),
   zones: document.getElementById('zones'),
 };
@@ -70,6 +84,16 @@ function el(tag, options = {}, children = []) {
   return node;
 }
 
+function iconTile(name, tone) {
+  const tile = el('span', { className: `tile tile-${tone}`, attrs: { 'aria-hidden': 'true' } });
+  const svg = new DOMParser().parseFromString(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${ICONS[name]}</svg>`,
+    'image/svg+xml',
+  ).documentElement;
+  tile.append(document.importNode(svg, true));
+  return tile;
+}
+
 function watchKey(watch) {
   return watch.kind === 'ZONE' ? `ZONE:${watch.value}` : `PLACE:${fold(watch.value)}`;
 }
@@ -89,10 +113,6 @@ function toggleWatch(kind, value) {
   state.watches = exists
     ? state.watches.filter(watch => watchKey(watch) !== key)
     : [...state.watches, { kind, value }];
-  afterWatchesChanged();
-}
-
-function afterWatchesChanged() {
   saveWatches();
   renderAll();
   syncSubscription();
@@ -113,6 +133,128 @@ function upcomingClosuresFor(watch) {
   return state.plan.closures
     .filter(closure => closure.end > now && watchMatchesClosure(watch, closure))
     .sort((first, second) => first.start - second.start);
+}
+
+function endsAnotherDay(closure) {
+  return formatDayLabel(closure.end) !== formatDayLabel(closure.start);
+}
+
+function endTimeText(closure) {
+  const endTime = timeFormat.format(closure.end);
+  return endsAnotherDay(closure) && endTime === '00:00' ? '24:00' : endTime;
+}
+
+function formatWindow(closure) {
+  const endTime = endTimeText(closure);
+  const suffix = endsAnotherDay(closure) && endTime !== '24:00' ? ` (${t('plan.nextDay')})` : '';
+  return `${timeFormat.format(closure.start)} – ${endTime}${suffix}`;
+}
+
+function dayHeading(epochMs) {
+  const relative = formatRelativeDay(epochMs);
+  const label = formatDayLabel(epochMs);
+  return relative === label ? label : `${relative} · ${label}`;
+}
+
+function statusFor(upcoming) {
+  const now = Date.now();
+  const live = upcoming.find(closure => closure.start <= now);
+  if (live) {
+    const endsToday = formatRelativeDay(live.end) === formatRelativeDay(now);
+    const until = endsToday ? endTimeText(live) : `${formatRelativeDay(live.end)} ${endTimeText(live)}`;
+    return { tone: 'bad', title: t('status.liveNow'), detail: t('status.until', { time: until }) };
+  }
+  const next = upcoming[0];
+  if (next) {
+    return { tone: 'warn', title: t('status.next'), detail: `${formatRelativeDay(next.start)} · ${formatWindow(next)}` };
+  }
+  return { tone: 'ok', title: t('status.none'), detail: t('status.noneDetail') };
+}
+
+function scheduleItem(closure, showZone) {
+  const live = closure.start <= Date.now();
+  return el('li', {}, [
+    el('strong', { text: formatRelativeDay(closure.start) }),
+    el('span', { text: ` · ${formatWindow(closure)}` }),
+    ...(showZone ? [el('span', { text: ` · ${t('zone', { zone: closure.zone })}` })] : []),
+    ...(live ? [el('span', { text: t('plan.live'), className: 'badge live' })] : []),
+  ]);
+}
+
+function homeCard(watch) {
+  const upcoming = upcomingClosuresFor(watch);
+  const status = statusFor(upcoming);
+  const key = watchKey(watch);
+  const card = el('article', { className: `home-card tone-${status.tone}` }, [
+    el('p', { text: watchLabel(watch), className: 'home-card-name' }),
+    el('p', { text: status.title, className: 'home-card-title' }),
+    el('p', { text: status.detail, className: 'home-card-detail' }),
+  ]);
+  if (upcoming.length > 1) {
+    const details = el('details', { className: 'all-times', attrs: { 'data-key': key } }, [
+      el('summary', { text: t('home.allTimes', { count: upcoming.length }) }),
+      el('ul', {}, upcoming.map(closure => scheduleItem(closure, watch.kind !== 'ZONE'))),
+    ]);
+    details.open = state.openDetails.has(key);
+    details.addEventListener('toggle', () => {
+      if (details.open) state.openDetails.add(key);
+      else state.openDetails.delete(key);
+    });
+    card.append(details);
+  }
+  return card;
+}
+
+function renderHome() {
+  renderBanner();
+  if (state.watches.length === 0) {
+    nodes.homeContent.replaceChildren(
+      el('div', { className: 'empty-state' }, [
+        iconTile('drop', 'blue'),
+        el('h2', { text: t('home.emptyTitle') }),
+        el('p', { text: t('home.emptyText'), className: 'muted' }),
+        el('button', { text: t('home.add'), className: 'btn primary', attrs: { type: 'button' }, onClick: () => navigate('add') }),
+      ]),
+    );
+    return;
+  }
+  nodes.homeContent.replaceChildren(
+    ...state.watches.map(homeCard),
+    el('button', { text: t('home.addMore'), className: 'btn wide', attrs: { type: 'button' }, onClick: () => navigate('add') }),
+  );
+}
+
+function alertsMode() {
+  if (isIosBrowserTab()) return 'ios';
+  if (!pushSupported()) return 'unsupported';
+  if (Notification.permission === 'denied') return 'blocked';
+  return 'ready';
+}
+
+function renderBanner() {
+  const mode = alertsMode();
+  const needsBanner = state.watches.length > 0 && !state.subscription && (mode === 'ready' || mode === 'ios');
+  if (!needsBanner) {
+    nodes.homeBanner.replaceChildren();
+    return;
+  }
+  nodes.homeBanner.replaceChildren(
+    el('div', { className: 'banner' }, [
+      iconTile('bell', 'orange'),
+      el('p', { text: t('home.bannerText'), className: 'banner-text' }),
+      el('button', {
+        text: t('home.bannerButton'),
+        className: 'btn primary small',
+        attrs: { type: 'button' },
+        onClick: () => (mode === 'ios' ? navigate('alerts') : startEnableAlerts()),
+      }),
+    ]),
+  );
+}
+
+function renderMenuValues() {
+  nodes.menuAddValue.textContent = state.watches.length > 0 ? t('menu.selected', { count: state.watches.length }) : '';
+  nodes.menuAlertsValue.textContent = state.subscription ? t('menu.on') : t('menu.off');
 }
 
 function renderLanguageSwitch() {
@@ -143,21 +285,9 @@ function renderZonePicker() {
 
 function renderWatchList() {
   nodes.watchEmpty.hidden = state.watches.length > 0;
-  const now = Date.now();
   nodes.watchList.replaceChildren(
-    ...state.watches.map(watch => {
-      const upcoming = upcomingClosuresFor(watch);
-      const schedule = upcoming.length === 0
-        ? [el('li', { text: t('watch.noClosure'), className: 'watch-none' })]
-        : upcoming.map(closure =>
-            el('li', { className: closure.start <= now ? 'watch-live' : '' }, [
-              el('strong', { text: formatRelativeDay(closure.start) }),
-              el('span', { text: ` · ${formatWindow(closure)}` }),
-              ...(watch.kind === 'ZONE' ? [] : [el('span', { text: ` · ${t('zone', { zone: closure.zone })}` })]),
-              ...(closure.start <= now ? [el('span', { text: t('plan.live'), className: 'badge live' })] : []),
-            ]),
-          );
-      return el('li', { className: 'watch-item' }, [
+    ...state.watches.map(watch =>
+      el('li', { className: 'watch-item' }, [
         el('div', { className: 'watch-head' }, [
           el('span', { text: watchLabel(watch), className: 'watch-name' }),
           el('button', {
@@ -167,26 +297,9 @@ function renderWatchList() {
             onClick: () => toggleWatch(watch.kind, watch.value),
           }),
         ]),
-        el('ul', { className: 'watch-schedule' }, schedule),
-      ]);
-    }),
+      ]),
+    ),
   );
-}
-
-function formatWindow(closure) {
-  const endsAnotherDay = formatDayLabel(closure.end) !== formatDayLabel(closure.start);
-  const endTime = timeFormat.format(closure.end);
-  if (endsAnotherDay && endTime === '00:00') {
-    return `${timeFormat.format(closure.start)} – 24:00`;
-  }
-  const suffix = endsAnotherDay ? ` (${t('plan.nextDay')})` : '';
-  return `${timeFormat.format(closure.start)} – ${endTime}${suffix}`;
-}
-
-function dayHeading(epochMs) {
-  const relative = formatRelativeDay(epochMs);
-  const label = formatDayLabel(epochMs);
-  return relative === label ? label : `${relative} · ${label}`;
 }
 
 function renderClosures() {
@@ -254,13 +367,14 @@ function renderUpdated() {
     nodes.updated.textContent = t('header.loading');
     return;
   }
-  const label = state.plan.status ? `${state.plan.status} · ` : '';
-  nodes.updated.textContent = `${label}${t('plan.updated', { time: timeFormat.format(state.plan.fetchedAt) })}`;
+  nodes.updated.textContent = t('plan.updated', { time: timeFormat.format(state.plan.fetchedAt) });
 }
 
 function renderAll() {
   renderLanguageSwitch();
   renderUpdated();
+  renderHome();
+  renderMenuValues();
   renderZonePicker();
   renderWatchList();
   renderClosures();
@@ -356,19 +470,20 @@ function urlBase64ToBytes(value) {
 
 function renderAlertsState() {
   nodes.alertsHint.hidden = true;
-  if (isIosBrowserTab()) {
+  const mode = alertsMode();
+  if (mode === 'ios') {
     nodes.alertsText.textContent = t('alerts.ios');
     nodes.alertsHint.textContent = t('alerts.iosHint');
     nodes.alertsHint.hidden = false;
     nodes.alertsToggle.hidden = true;
     return;
   }
-  if (!pushSupported()) {
+  if (mode === 'unsupported') {
     nodes.alertsText.textContent = t('alerts.unsupported');
     nodes.alertsToggle.hidden = true;
     return;
   }
-  if (Notification.permission === 'denied') {
+  if (mode === 'blocked') {
     nodes.alertsText.textContent = t('alerts.blocked');
     nodes.alertsToggle.hidden = true;
     return;
@@ -415,7 +530,7 @@ async function syncSubscription() {
 async function enableAlerts() {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    renderAlertsState();
+    renderAll();
     return;
   }
   const registration = await navigator.serviceWorker.ready;
@@ -425,7 +540,7 @@ async function enableAlerts() {
     applicationServerKey: urlBase64ToBytes(publicKey),
   });
   await syncSubscription();
-  renderAlertsState();
+  renderAll();
 }
 
 async function disableAlerts() {
@@ -434,20 +549,26 @@ async function disableAlerts() {
   await state.subscription.unsubscribe();
   state.subscription = null;
   await postJson('/api/unsubscribe', { endpoint }).catch(() => undefined);
-  renderAlertsState();
+  renderAll();
 }
 
-nodes.alertsToggle.addEventListener('click', async () => {
+async function toggleAlerts(action) {
   nodes.alertsToggle.disabled = true;
   state.alertsMessage = '';
   try {
-    await (state.subscription ? disableAlerts() : enableAlerts());
+    await action();
   } catch {
     showAlertsMessage('alerts.failed');
   } finally {
     nodes.alertsToggle.disabled = false;
   }
-});
+}
+
+function startEnableAlerts() {
+  toggleAlerts(enableAlerts);
+}
+
+nodes.alertsToggle.addEventListener('click', () => toggleAlerts(state.subscription ? disableAlerts : enableAlerts));
 
 function changeLanguage(lang) {
   setLanguage(lang);
@@ -456,6 +577,41 @@ function changeLanguage(lang) {
   renderAll();
   syncSubscription();
 }
+
+function screenFromHash() {
+  const name = location.hash.slice(1);
+  return SCREENS.includes(name) ? name : 'home';
+}
+
+function showScreen(name) {
+  for (const section of nodes.screens) {
+    section.hidden = section.dataset.screen !== name;
+  }
+  window.scrollTo(0, 0);
+}
+
+function navigate(name) {
+  if (name === screenFromHash()) return;
+  const depth = (history.state?.depth ?? 0) + 1;
+  history.pushState({ screen: name, depth }, '', name === 'home' ? location.pathname : `#${name}`);
+  showScreen(name);
+}
+
+function goBack() {
+  if ((history.state?.depth ?? 0) > 0) {
+    history.back();
+    return;
+  }
+  history.replaceState({ screen: 'home', depth: 0 }, '', location.pathname);
+  showScreen('home');
+}
+
+window.addEventListener('popstate', () => showScreen(screenFromHash()));
+
+nodes.menuButton.addEventListener('click', () => navigate('menu'));
+nodes.addDone.addEventListener('click', () => navigate('home'));
+document.querySelectorAll('[data-nav]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.nav)));
+document.querySelectorAll('[data-nav-back]').forEach(button => button.addEventListener('click', goBack));
 
 async function loadData() {
   const [plan, zonePlaces] = await Promise.all([
@@ -476,13 +632,15 @@ function loadDataQuietly() {
 }
 
 async function init() {
+  history.replaceState({ screen: screenFromHash(), depth: 0 }, '', location.href);
+  showScreen(screenFromHash());
   applyStaticTexts();
   renderAll();
   await loadDataQuietly();
   if (pushSupported() && !isIosBrowserTab()) {
     const registration = await navigator.serviceWorker.register('/sw.js');
     state.subscription = await registration.pushManager.getSubscription();
-    renderAlertsState();
+    renderAll();
     syncSubscription();
   }
   setInterval(loadDataQuietly, 5 * 60 * 1000);
