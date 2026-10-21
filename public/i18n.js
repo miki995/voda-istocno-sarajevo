@@ -41,7 +41,7 @@ const DICTIONARY = {
     'zones.count': '{count} mjesta',
     'zone': 'Zona {zone}',
     'footer.source': 'Izvor:',
-    'footer.disclaimer': 'neslužbeni servis, provjeri i kod vodovoda.',
+    'footer.official': 'službeni sajt vodovoda Istočno Sarajevo.',
   },
   en: {
     'meta.title': 'Water Istočno Sarajevo',
@@ -81,7 +81,7 @@ const DICTIONARY = {
     'zones.count': '{count} places',
     'zone': 'Zone {zone}',
     'footer.source': 'Source:',
-    'footer.disclaimer': 'unofficial service, double-check with the water utility.',
+    'footer.official': 'the official website of the Istočno Sarajevo water utility.',
   },
 };
 
