@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="bs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Voda Istočno Sarajevo</title>
+  <meta name="description" content="Obavještenja o nestanku vode u Istočnom Sarajevu za tvoju ulicu ili zonu.">
+  <meta name="theme-color" content="#0b5fa5">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Voda · Istočno Sarajevo</h1>
+    <p id="updated" class="muted">Učitavam plan…</p>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="alerts-title">
+      <h2 id="alerts-title">Obavještenja</h2>
+      <p id="alerts-text" class="muted"></p>
+      <div class="row">
+        <button id="alerts-toggle" class="btn primary" type="button">Uključi obavještenja</button>
+      </div>
+      <p id="alerts-hint" class="hint" hidden></p>
+    </section>
+
+    <section class="card" aria-labelledby="watch-title">
+      <h2 id="watch-title">Moje ulice i zone</h2>
+      <p class="muted">Dobijaš poruku čim se plan objavi, ujutro na dan zatvaranja i oko 2 sata prije nego voda nestane.</p>
+
+      <div class="search">
+        <label class="sr-only" for="search-input">Pretraži ulicu ili naselje</label>
+        <input id="search-input" type="search" inputmode="search" autocomplete="off" autocapitalize="off" placeholder="Ukucaj ulicu ili naselje…">
+        <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
+      </div>
+
+      <div class="zone-picker" id="zone-picker" role="group" aria-label="Izaberi cijelu zonu"></div>
+
+      <ul id="watch-list" class="chips" aria-live="polite"></ul>
+      <p id="watch-empty" class="muted">Još ništa nije izabrano.</p>
+    </section>
+
+    <section class="card" aria-labelledby="today-title">
+      <h2 id="today-title">Plan redukcije</h2>
+      <div id="closures"></div>
+    </section>
+
+    <section class="card" aria-labelledby="zones-title">
+      <h2 id="zones-title">Šta pripada kojoj zoni</h2>
+      <p class="muted">Spisak se dopunjuje iz svakog objavljenog plana. Dodirni ulicu da je dodaš.</p>
+      <div id="zones"></div>
+    </section>
+  </main>
+
+  <footer class="foot muted">
+    Izvor: <a href="https://vikis.info/" rel="noopener">vikis.info</a> · neslužbeni servis, provjeri i kod vodovoda.
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

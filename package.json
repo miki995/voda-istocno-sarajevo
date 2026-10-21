@@ -1,0 +1,25 @@
+{
+  "name": "voda-istocno-sarajevo",
+  "version": "1.0.0",
+  "description": "Obavjestenja o nestanku vode u Istocnom Sarajevu",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node --test test/parser.test.js",
+    "dev": "node scripts/dev-server.mjs",
+    "keys": "node scripts/generate-vapid-keys.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
+    "@upstash/redis": "^1.39.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
