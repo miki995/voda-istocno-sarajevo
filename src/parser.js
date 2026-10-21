@@ -2,7 +2,7 @@ import { fold } from './text.js';
 import { dayKey, formatTime, localEpoch } from './time.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const HEADER_PATTERN = /ZATVARANJE\s+(\d{1,2})\.(\d{1,2})\.(\d{4})\.?\s+od\s+(\d{1,2}):(\d{2})\s+do\s+(\d{1,2}):(\d{2})\s*(?:časova|časa|sati)?\.?\s*(?:(\d{1,2})\.(\d{1,2})\.(\d{4})\.?)?\s*[-–]?\s*ZONA\s+(IV|V|I{1,3})/i;
+const HEADER_PATTERN = /ZATVARANJE\s+(\d{1,2})\.(\d{1,2})\.(\d{4})\.?\s+od\s+(\d{1,2}):(\d{2})\s+do\s+(\d{1,2}):(\d{2})\s*(?:časova|časa|sati)?\.?\s*(?:(\d{1,2})\.(\d{1,2})\.(\d{4})\.?)?\s*(?:[-–]\s*)*ZONA\s+(IV|V|I{1,3})/i;
 const LEADING_WORDS = /^(naselje|naselja|ulice|ulica|ulici|dio|dijela)\s*:?\s+/i;
 const CONNECTOR_WORDS = /\s+(od|do|zatim|prema)\s+/i;
 
@@ -59,6 +59,7 @@ function buildClosure(header) {
 
 export function parsePlan(html) {
   const closures = [];
+  const unparsedHeaders = [];
   let current = null;
 
   for (const line of htmlToLines(extractDescription(html))) {
@@ -66,6 +67,9 @@ export function parsePlan(html) {
     if (header) {
       current = buildClosure(header);
       closures.push(current);
+    } else if (/^zatvaranje/i.test(line)) {
+      unparsedHeaders.push(line);
+      current = null;
     } else if (current) {
       current.lines.push(line.replace(/^[-–]\s*/, ''));
     }
@@ -74,6 +78,7 @@ export function parsePlan(html) {
   return {
     status: extractStatus(html),
     closures: closures.map(closure => ({ ...closure, text: closure.lines.join(' ') })),
+    unparsedHeaders,
   };
 }
 

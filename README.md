@@ -7,6 +7,8 @@ The site is available in Serbian (default, Latin script) and English. The langua
 ## How it works
 
 - `/api/cron` reads vikis.info, extracts the closures (zone, time window, neighbourhoods and streets), stores them in Redis and sends web push notifications.
+- The home page only shows today's plan, but its calendar lists the plans for the following days (`/sr/event/show/{id}`). Those are read as well, up to 7 days ahead, and refreshed every 30 minutes or when the list of events changes.
+- If a closure header cannot be parsed, it is logged (`could not read closure header`) rather than dropped silently.
 - A GitHub Actions workflow (`.github/workflows/poll.yml`) calls `/api/cron` every 5 minutes. Vercel Hobby only allows a daily cron, so the daily cron in `vercel.json` is just a fallback.
 - A subscription is a set of watches: a street or neighbourhood (matching ignores š, đ, č, ć, ž) or a whole zone (I, II, III).
 - Notifications are sent when the plan is published, in the morning of the closure day (after 07:00) and about 2 hours before the closure starts. If several are due at once, only the most urgent one is sent.

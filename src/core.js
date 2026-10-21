@@ -1,11 +1,15 @@
 import { buildPushPayload } from '@block65/webcrypto-web-push';
+import { parseCalendarEvents, selectUpcomingPlanEvents } from './events.js';
 import { mergePlacesByZone, parsePlan } from './parser.js';
+import { dayKey } from './time.js';
 import { normalizeLanguage } from './messages.js';
 import { planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
 import zonesSeed from './zones-seed.json' with { type: 'json' };
 
 const SOURCE_URL = 'https://vikis.info/';
+const EVENT_URL = 'https://vikis.info/sr/event/show/';
+const UPCOMING_REFRESH_MS = 30 * 60 * 1000;
 const MAX_WATCHES = 30;
 const ZONES = ['I', 'II', 'III'];
 const SUBS_SET = 'subs';
@@ -53,21 +57,64 @@ export async function loadZonePlaces(store) {
   return (await store.get('zonePlaces')) ?? zonesSeed;
 }
 
-export async function refreshPlan(store, now) {
-  const response = await fetch(SOURCE_URL, { headers: { 'user-agent': 'voda-istocno-sarajevo/1.0' } });
+async function fetchText(url) {
+  const response = await fetch(url, { headers: { 'user-agent': 'voda-istocno-sarajevo/1.0' } });
   if (!response.ok) {
-    throw new Error(`vikis.info answered ${response.status}`);
+    throw new Error(`${url} answered ${response.status}`);
   }
-  const parsed = parsePlan(await response.text());
+  return response.text();
+}
+
+function reportUnparsed(headers) {
+  for (const header of headers) {
+    console.error('could not read closure header:', header);
+  }
+}
+
+async function loadUpcomingClosures(store, homeHtml, now) {
+  const events = selectUpcomingPlanEvents(parseCalendarEvents(homeHtml), dayKey(now));
+  const idsKey = events.map(event => event.id).join(',');
+  const cached = await store.get('upcoming');
+  if (cached && cached.idsKey === idsKey && now - cached.fetchedAt < UPCOMING_REFRESH_MS) {
+    return cached.closures;
+  }
+  const results = await Promise.allSettled(events.map(event => fetchText(`${EVENT_URL}${event.id}`)));
+  const failed = results.some(result => result.status === 'rejected');
+  if (failed && cached) {
+    return cached.closures;
+  }
+  const pages = results.filter(result => result.status === 'fulfilled').map(result => parsePlan(result.value));
+  pages.forEach(page => reportUnparsed(page.unparsedHeaders));
+  const closures = pages.flatMap(page => page.closures);
+  await store.set('upcoming', { idsKey, fetchedAt: now, closures });
+  return closures;
+}
+
+function mergeClosures(...groups) {
+  const byId = new Map();
+  for (const closure of groups.flat()) {
+    if (!byId.has(closure.id)) {
+      byId.set(closure.id, closure);
+    }
+  }
+  return [...byId.values()].sort((first, second) => first.start - second.start);
+}
+
+export async function refreshPlan(store, now) {
+  const homeHtml = await fetchText(SOURCE_URL);
+  const parsed = parsePlan(homeHtml);
+  reportUnparsed(parsed.unparsedHeaders);
+  const upcoming = await loadUpcomingClosures(store, homeHtml, now).catch(() => []);
+  const closures = mergeClosures(parsed.closures, upcoming);
   const previous = await loadPlan(store);
-  const closuresChanged = JSON.stringify(previous.closures) !== JSON.stringify(parsed.closures);
-  const plan = { fetchedAt: now, status: parsed.status, closures: parsed.closures };
+  const closuresChanged = JSON.stringify(previous.closures) !== JSON.stringify(closures);
+  const plan = { fetchedAt: now, status: parsed.status, closures };
 
   if (closuresChanged || now - previous.fetchedAt > HOUR_MS) {
     await store.set('plan', plan);
   }
   if (closuresChanged) {
-    await store.set('zonePlaces', mergePlacesByZone(await loadZonePlaces(store), parsed.closures));
+    await store.set('zonePlaces', mergePlacesByZone(await loadZonePlaces(store), closures));
   }
   return plan;
 }

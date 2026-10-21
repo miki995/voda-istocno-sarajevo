@@ -39,6 +39,12 @@ export function formatTime(epochMs) {
   return `${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
+export function formatEndTime(startMs, endMs) {
+  const end = localParts(endMs);
+  const endsAtMidnight = end.hour === 0 && end.minute === 0 && dayKey(endMs) !== dayKey(startMs);
+  return endsAtMidnight ? '24:00' : formatTime(endMs);
+}
+
 export function formatDay(epochMs) {
   const parts = localParts(epochMs);
   return `${pad(parts.day)}.${pad(parts.month)}.`;

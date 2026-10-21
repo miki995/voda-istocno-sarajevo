@@ -1,10 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { parseCalendarEvents, selectUpcomingPlanEvents } from '../src/events.js';
 import { extractPlaces, mergePlacesByZone, parsePlan } from '../src/parser.js';
 import { matchedWatches, planNotifications } from '../src/notify.js';
 import { fold } from '../src/text.js';
-import { localEpoch } from '../src/time.js';
+import { formatEndTime, localEpoch } from '../src/time.js';
 
 const html = readFileSync(new URL('./fixture-home.html', import.meta.url), 'utf8');
 const plan = parsePlan(html);
@@ -31,6 +32,60 @@ describe('parsePlan', () => {
 
   it('reads the status label', () => {
     assert.equal(plan.status, 'PLAN REDUKCIJA');
+  });
+});
+
+describe('upcoming days', () => {
+  const eventPage = parsePlan(readFileSync(new URL('./fixture-event.html', import.meta.url), 'utf8'));
+  const events = parseCalendarEvents(html);
+
+  it('reads the calendar events from the home page', () => {
+    assert.ok(events.length > 20);
+    assert.deepEqual(events.find(event => event.date === '2026-10-22'), { date: '2026-10-22', title: 'PLAN REDUKCIJA', id: '656' });
+  });
+
+  it('selects only plan events after today', () => {
+    const upcoming = selectUpcomingPlanEvents(events, '2026-10-21');
+    assert.deepEqual(upcoming.map(event => event.date), ['2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
+    assert.deepEqual(upcoming.map(event => event.id), ['656', '657', '658', '659']);
+  });
+
+  it('looks at most seven days ahead', () => {
+    const synthetic = Array.from({ length: 12 }, (_, index) => ({ date: `2026-10-${String(22 + index).padStart(2, '0')}`, title: 'PLAN REDUKCIJA', id: String(index) }));
+    const upcoming = selectUpcomingPlanEvents(synthetic, '2026-10-21');
+    assert.equal(upcoming.length, 7);
+    assert.equal(upcoming.at(-1).date, '2026-10-28');
+  });
+
+  it('ignores events that are not reduction plans', () => {
+    const upcoming = selectUpcomingPlanEvents([{ date: '2026-10-22', title: 'Vanredno obavještenje', id: '1' }], '2026-10-21');
+    assert.equal(upcoming.length, 0);
+  });
+
+  it('reads the closures of a future day with their zones', () => {
+    assert.equal(eventPage.closures.length, 4);
+    assert.deepEqual(eventPage.closures.map(closure => closure.zone), ['III', 'I', 'II', 'III']);
+    assert.equal(eventPage.closures[0].start, localEpoch(2026, 10, 22, 4, 30));
+  });
+
+  it('reads a header that has a doubled dash before the zone', () => {
+    const doubleDash = parsePlan(readFileSync(new URL('./fixture-event-double-dash.html', import.meta.url), 'utf8'));
+    assert.equal(doubleDash.closures.length, 4);
+    assert.deepEqual(doubleDash.closures.map(closure => closure.zone), ['I', 'II', 'III', 'I']);
+    assert.deepEqual(doubleDash.unparsedHeaders, []);
+  });
+
+  it('reports headers it cannot read instead of dropping them silently', () => {
+    const broken = '<div class="modal-description"><p>ZATVARANJE 23.10.2026 nešto neočekivano</p><p>-Dobrinja</p></div>';
+    const result = parsePlan(broken);
+    assert.equal(result.closures.length, 0);
+    assert.equal(result.unparsedHeaders.length, 1);
+  });
+
+  it('shows an end at midnight as 24:00', () => {
+    const start = localEpoch(2026, 10, 22, 16, 30);
+    assert.equal(formatEndTime(start, localEpoch(2026, 10, 23, 0, 0)), '24:00');
+    assert.equal(formatEndTime(start, localEpoch(2026, 10, 22, 18, 0)), '18:00');
   });
 });
 

@@ -175,8 +175,18 @@ function renderWatchList() {
 
 function formatWindow(closure) {
   const endsAnotherDay = formatDayLabel(closure.end) !== formatDayLabel(closure.start);
+  const endTime = timeFormat.format(closure.end);
+  if (endsAnotherDay && endTime === '00:00') {
+    return `${timeFormat.format(closure.start)} – 24:00`;
+  }
   const suffix = endsAnotherDay ? ` (${t('plan.nextDay')})` : '';
-  return `${timeFormat.format(closure.start)} – ${timeFormat.format(closure.end)}${suffix}`;
+  return `${timeFormat.format(closure.start)} – ${endTime}${suffix}`;
+}
+
+function dayHeading(epochMs) {
+  const relative = formatRelativeDay(epochMs);
+  const label = formatDayLabel(epochMs);
+  return relative === label ? label : `${relative} · ${label}`;
 }
 
 function renderClosures() {
@@ -199,7 +209,7 @@ function renderClosures() {
           el('span', { text: formatWindow(closure), className: 'closure-time' }),
           el('span', { className: 'row' }, badges),
         ]),
-        el('p', { text: formatDayLabel(closure.start), className: 'muted' }),
+        el('p', { text: dayHeading(closure.start), className: 'muted' }),
         el('ul', {}, closure.lines.map(line => el('li', { text: line }))),
       ]);
     }),

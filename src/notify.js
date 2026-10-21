@@ -1,6 +1,6 @@
 import { DEFAULT_LANGUAGE, messagesFor } from './messages.js';
 import { fold } from './text.js';
-import { dayKey, formatDay, formatTime, localParts } from './time.js';
+import { dayKey, formatDay, formatEndTime, formatTime, localParts } from './time.js';
 
 export const LEAD_MS = 2 * 60 * 60 * 1000;
 export const MORNING_HOUR = 7;
@@ -43,7 +43,7 @@ function dueKinds(closure, sent, now) {
 
 function buildMessage(kind, closure, labels, now, lang) {
   const messages = messagesFor(lang);
-  const window = `${formatTime(closure.start)}–${formatTime(closure.end)}`;
+  const window = `${formatTime(closure.start)}–${formatEndTime(closure.start, closure.end)}`;
   const where = labels.join(', ');
   const zone = messages.zone(closure.zone);
   if (kind === 'SOON') {
