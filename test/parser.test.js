@@ -210,7 +210,7 @@ describe('utility notices', () => {
   it('selects recent notices but not plans or old schedules', () => {
     const picked = selectRecentNoticeEvents(events, '2026-10-16');
     assert.ok(picked.length > 0);
-    assert.ok(picked.every(event => event.date >= '2026-10-13' && event.date <= '2026-10-23'));
+    assert.ok(picked.every(event => event.date >= '2026-10-02' && event.date <= '2026-10-23'));
     assert.ok(picked.every(event => !/plan redukcij|raspored redukcij/i.test(event.title)));
     assert.deepEqual(picked.map(event => event.date), [...picked.map(event => event.date)].sort().reverse());
   });

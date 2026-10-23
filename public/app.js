@@ -6,6 +6,7 @@ const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
 const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'zones'];
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOME_NOTICE_DAYS = 3;
 const VISITOR_KEY = 'voda-visitor';
 const SESSION_KEY = 'voda-session-counted';
 
@@ -264,7 +265,8 @@ function noticeCard(notice) {
 
 function noticeCards() {
   const notices = noticeList();
-  const mine = notices.filter(noticeMatches);
+  const fresh = notice => noticeEpoch(notice) >= Date.now() - HOME_NOTICE_DAYS * DAY_MS;
+  const mine = notices.filter(notice => fresh(notice) && noticeMatches(notice));
   const recentOthers = notices.filter(notice => !noticeMatches(notice) && noticeEpoch(notice) >= Date.now() - 1.5 * DAY_MS);
   const shortage = recentOthers.filter(notice => notice.kind === 'shortage');
   const others = recentOthers.filter(notice => notice.kind !== 'shortage');

@@ -25,7 +25,7 @@ export function selectUpcomingPlanEvents(events, todayKey, maxDays = 7) {
     .sort((first, second) => first.date.localeCompare(second.date));
 }
 
-export function selectRecentNoticeEvents(events, todayKey, daysBack = 3, daysAhead = 7) {
+export function selectRecentNoticeEvents(events, todayKey, daysBack = 14, daysAhead = 7) {
   const fromKey = shiftDay(todayKey, -daysBack);
   const toKey = shiftDay(todayKey, daysAhead);
   return events
