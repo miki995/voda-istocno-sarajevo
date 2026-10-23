@@ -23,6 +23,14 @@ function memoryStore() {
     async smembers(key) {
       return [...(sets.get(key) ?? [])];
     },
+    async scard(key) {
+      return sets.get(key)?.size ?? 0;
+    },
+    async incr(key) {
+      const next = (values.get(key) ?? 0) + 1;
+      values.set(key, next);
+      return next;
+    },
   };
 }
 
@@ -46,6 +54,12 @@ function redisStore(redis) {
     },
     async smembers(key) {
       return redis.smembers(key);
+    },
+    async scard(key) {
+      return redis.scard(key);
+    },
+    async incr(key) {
+      return redis.incr(key);
     },
   };
 }

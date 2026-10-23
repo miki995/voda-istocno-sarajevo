@@ -14,6 +14,7 @@ const DICTIONARY = {
     'menu.add': 'Moje ulice i zone',
     'menu.alerts': 'Obavještenja',
     'menu.plan': 'Cijeli plan redukcije',
+    'menu.notices': 'Obavještenja vodovoda',
     'menu.zones': 'Zone i ulice',
     'menu.language': 'Jezik',
     'menu.on': 'Uključena',
@@ -52,6 +53,20 @@ const DICTIONARY = {
     'watch.remove': 'Ukloni {name}',
     'watch.addTyped': 'dodaj kako si ukucao',
     'watch.noClosure': 'Nema objavljenog zatvaranja u trenutnom planu.',
+    'notices.title': 'Obavještenja vodovoda',
+    'notices.help': 'Kvarovi, radovi i najave isključenja koje vodovod objavi van redovnog plana.',
+    'notices.none': 'Nema obavještenja u posljednjih nekoliko dana.',
+    'notices.mine': 'tvoja ulica',
+    'notices.read': 'Pročitaj obavještenje',
+    'home.noticeMine': 'Obavještenje za tvoju ulicu',
+    'kind.breakdown': 'Obavještenje',
+    'kind.shutdown': 'Najava isključenja',
+    'kind.shortage': 'Smanjena isporuka vode',
+    'kind.closure': 'Zatvaranje vode',
+    'home.shortage': 'Smanjena isporuka vode',
+    'home.shortageDetail': 'zbog niske izdašnosti izvorišta, pogledaj gdje',
+    'home.noticesOther': 'Obavještenja vodovoda ({count})',
+    'home.noticesOtherDetail': 'kvarovi i radovi u ostalim naseljima',
     'day.today': 'Danas',
     'day.tomorrow': 'Sutra',
     'plan.title': 'Plan redukcije',
@@ -80,6 +95,7 @@ const DICTIONARY = {
     'menu.add': 'My streets and zones',
     'menu.alerts': 'Alerts',
     'menu.plan': 'Full outage plan',
+    'menu.notices': 'Utility notices',
     'menu.zones': 'Zones and streets',
     'menu.language': 'Language',
     'menu.on': 'On',
@@ -118,6 +134,20 @@ const DICTIONARY = {
     'watch.remove': 'Remove {name}',
     'watch.addTyped': 'add as typed',
     'watch.noClosure': 'No closure in the currently published plan.',
+    'notices.title': 'Utility notices',
+    'notices.help': 'Breakdowns, works and shutdown announcements the utility publishes outside the regular plan. The text is published in Serbian.',
+    'notices.none': 'No notices in the last few days.',
+    'notices.mine': 'your street',
+    'notices.read': 'Read the notice',
+    'home.noticeMine': 'Notice for your street',
+    'kind.breakdown': 'Notice',
+    'kind.shutdown': 'Planned shutdown',
+    'kind.shortage': 'Reduced water supply',
+    'kind.closure': 'Water cut',
+    'home.shortage': 'Reduced water supply',
+    'home.shortageDetail': 'low spring yield, see where',
+    'home.noticesOther': 'Utility notices ({count})',
+    'home.noticesOtherDetail': 'breakdowns and works in other neighbourhoods',
     'day.today': 'Today',
     'day.tomorrow': 'Tomorrow',
     'plan.title': 'Outage plan',
@@ -151,7 +181,7 @@ function detectLanguage() {
   } catch {
     return DEFAULT_LANGUAGE;
   }
-  return navigator.language?.toLowerCase().startsWith('en') ? 'en' : DEFAULT_LANGUAGE;
+  return DEFAULT_LANGUAGE;
 }
 
 let currentLanguage = detectLanguage();

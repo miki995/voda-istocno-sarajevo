@@ -13,20 +13,28 @@ const ENTITIES = {
   '&#39;': "'",
   '&lt;': '<',
   '&gt;': '>',
+  '&scaron;': 'š',
+  '&Scaron;': 'Š',
 };
 
-function htmlToLines(fragment) {
+const ENTITY_PATTERN = new RegExp(Object.keys(ENTITIES).join('|'), 'g');
+
+export function decodeEntities(text) {
+  return text.replace(ENTITY_PATTERN, entity => ENTITIES[entity]);
+}
+
+export function htmlToLines(fragment) {
   return fragment
     .replace(/<\/p>|<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;|&amp;|&quot;|&#39;|&lt;|&gt;/g, entity => ENTITIES[entity])
+    .replace(ENTITY_PATTERN, entity => ENTITIES[entity])
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .split('\n')
     .map(line => line.replace(/\s+/g, ' ').trim())
     .filter(line => line.length > 0);
 }
 
-function extractDescription(html) {
+export function extractDescription(html) {
   const marker = html.indexOf('modal-description');
   if (marker === -1) {
     return '';
@@ -57,28 +65,46 @@ function buildClosure(header) {
   };
 }
 
+const MIN_PREAMBLE_LENGTH = 20;
+const MAX_HEADER_TITLE = 100;
+
 export function parsePlan(html) {
   const closures = [];
   const unparsedHeaders = [];
+  const extras = [];
+  const preamble = [];
   let current = null;
+  let extra = null;
 
   for (const line of htmlToLines(extractDescription(html))) {
     const header = line.match(HEADER_PATTERN);
     if (header) {
       current = buildClosure(header);
       closures.push(current);
+      extra = null;
     } else if (/^zatvaranje/i.test(line)) {
       unparsedHeaders.push(line);
+      extra = { kind: 'closure', title: line.slice(0, MAX_HEADER_TITLE), lines: [line] };
+      extras.push(extra);
       current = null;
     } else if (current) {
       current.lines.push(line.replace(/^[-–]\s*/, ''));
+    } else if (extra) {
+      extra.lines.push(line.replace(/^[-–]\s*/, ''));
+    } else {
+      preamble.push(line);
     }
+  }
+
+  if (preamble.join(' ').length >= MIN_PREAMBLE_LENGTH) {
+    extras.unshift({ kind: null, title: '', lines: preamble });
   }
 
   return {
     status: extractStatus(html),
     closures: closures.map(closure => ({ ...closure, text: closure.lines.join(' ') })),
     unparsedHeaders,
+    extras,
   };
 }
 

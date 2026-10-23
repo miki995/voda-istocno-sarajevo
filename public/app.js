@@ -1,9 +1,13 @@
+import { initAnalytics, trackEvent } from './analytics.js';
 import { LANGUAGES, applyStaticTexts, formatDayLabel, formatRelativeDay, getLanguage, setLanguage, t } from './i18n.js';
 
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
-const SCREENS = ['home', 'menu', 'add', 'alerts', 'plan', 'zones'];
+const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'zones'];
+const DAY_MS = 24 * 60 * 60 * 1000;
+const VISITOR_KEY = 'voda-visitor';
+const SESSION_KEY = 'voda-session-counted';
 
 const timeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -14,7 +18,7 @@ const ICONS = {
 
 const state = {
   watches: loadWatches(),
-  plan: { fetchedAt: 0, status: '', closures: [] },
+  plan: { fetchedAt: 0, status: '', closures: [], notices: [] },
   zonePlaces: {},
   subscription: null,
   alertsMessage: '',
@@ -30,6 +34,8 @@ const nodes = {
   menuButton: document.getElementById('menu-button'),
   menuAddValue: document.getElementById('menu-add-value'),
   menuAlertsValue: document.getElementById('menu-alerts-value'),
+  menuNoticesValue: document.getElementById('menu-notices-value'),
+  notices: document.getElementById('notices'),
   languageSwitch: document.getElementById('language-switch'),
   alertsText: document.getElementById('alerts-text'),
   alertsToggle: document.getElementById('alerts-toggle'),
@@ -113,6 +119,7 @@ function toggleWatch(kind, value) {
   state.watches = exists
     ? state.watches.filter(watch => watchKey(watch) !== key)
     : [...state.watches, { kind, value }];
+  if (!exists) trackEvent('add_watch', { kind });
   saveWatches();
   renderAll();
   syncSubscription();
@@ -121,7 +128,19 @@ function toggleWatch(kind, value) {
 function watchMatchesClosure(watch, closure) {
   if (watch.kind === 'ZONE') return watch.value === closure.zone;
   const needle = fold(watch.value);
-  return needle.length >= 3 && ` ${fold(closure.text)} `.includes(needle);
+  return needle.length >= 3 && ` ${fold(closure.text)} `.includes(` ${needle} `);
+}
+
+function noticeMatches(notice) {
+  return state.watches.some(watch => watch.kind === 'PLACE' && watchMatchesClosure(watch, notice));
+}
+
+function noticeEpoch(notice) {
+  return Date.parse(`${notice.date}T12:00:00Z`);
+}
+
+function noticeList() {
+  return state.plan.notices ?? [];
 }
 
 function closureMatches(closure) {
@@ -205,10 +224,75 @@ function homeCard(watch) {
   return card;
 }
 
+function noticeBody(notice) {
+  return el('div', { className: 'notice-body' }, notice.lines.map(line => el('p', { text: line })));
+}
+
+const KIND_TONE = { breakdown: 'bad', closure: 'bad', shutdown: 'bad', shortage: 'warn' };
+
+function noticeKind(notice) {
+  return KIND_TONE[notice.kind] ? notice.kind : 'breakdown';
+}
+
+function noticeSummary(notice) {
+  const text = notice.text.replace(/^obavje[sš]tavamo (potro[sš]a[cč]e )?/i, '');
+  return text.length > 110 ? `${text.slice(0, 110).trim()}…` : text;
+}
+
+function noticeCard(notice) {
+  const details = el('details', { className: 'all-times', attrs: { 'data-key': notice.id } }, [
+    el('summary', { text: t('notices.read') }),
+    noticeBody(notice),
+  ]);
+  details.open = state.openDetails.has(notice.id);
+  details.addEventListener('toggle', () => {
+    if (details.open) {
+      state.openDetails.add(notice.id);
+      trackEvent('read_notice', { kind: noticeKind(notice) });
+    } else {
+      state.openDetails.delete(notice.id);
+    }
+  });
+  const kind = noticeKind(notice);
+  return el('article', { className: `home-card notice-card tone-${KIND_TONE[kind]}` }, [
+    el('p', { text: `${t(`kind.${kind}`)} · ${t('notices.mine')} · ${formatRelativeDay(noticeEpoch(notice))}`, className: 'home-card-name' }),
+    el('p', { text: notice.title, className: 'home-card-title' }),
+    el('p', { text: noticeSummary(notice), className: 'home-card-detail' }),
+    details,
+  ]);
+}
+
+function noticeCards() {
+  const notices = noticeList();
+  const mine = notices.filter(noticeMatches);
+  const recentOthers = notices.filter(notice => !noticeMatches(notice) && noticeEpoch(notice) >= Date.now() - 1.5 * DAY_MS);
+  const shortage = recentOthers.filter(notice => notice.kind === 'shortage');
+  const others = recentOthers.filter(notice => notice.kind !== 'shortage');
+  const cards = mine.map(noticeCard);
+  if (shortage.length > 0) {
+    cards.push(
+      el('button', { className: 'home-card home-link tone-warn', attrs: { type: 'button' }, onClick: () => navigate('notices') }, [
+        el('p', { text: t('home.shortage'), className: 'home-card-title' }),
+        el('p', { text: t('home.shortageDetail'), className: 'home-card-detail' }),
+      ]),
+    );
+  }
+  if (others.length > 0) {
+    cards.push(
+      el('button', { className: 'home-card home-link', attrs: { type: 'button' }, onClick: () => navigate('notices') }, [
+        el('p', { text: t('home.noticesOther', { count: others.length }), className: 'home-card-title' }),
+        el('p', { text: t('home.noticesOtherDetail'), className: 'home-card-detail muted' }),
+      ]),
+    );
+  }
+  return cards;
+}
+
 function renderHome() {
   renderBanner();
   if (state.watches.length === 0) {
     nodes.homeContent.replaceChildren(
+      ...noticeCards(),
       el('div', { className: 'empty-state' }, [
         iconTile('drop', 'blue'),
         el('h2', { text: t('home.emptyTitle') }),
@@ -219,6 +303,7 @@ function renderHome() {
     return;
   }
   nodes.homeContent.replaceChildren(
+    ...noticeCards(),
     ...state.watches.map(homeCard),
     el('button', { text: t('home.addMore'), className: 'btn wide', attrs: { type: 'button' }, onClick: () => navigate('add') }),
   );
@@ -255,6 +340,7 @@ function renderBanner() {
 function renderMenuValues() {
   nodes.menuAddValue.textContent = state.watches.length > 0 ? t('menu.selected', { count: state.watches.length }) : '';
   nodes.menuAlertsValue.textContent = state.subscription ? t('menu.on') : t('menu.off');
+  nodes.menuNoticesValue.textContent = noticeList().length > 0 ? String(noticeList().length) : '';
 }
 
 function renderLanguageSwitch() {
@@ -299,6 +385,29 @@ function renderWatchList() {
         ]),
       ]),
     ),
+  );
+}
+
+function renderNotices() {
+  const notices = noticeList();
+  if (notices.length === 0) {
+    nodes.notices.replaceChildren(el('p', { text: t('notices.none'), className: 'muted' }));
+    return;
+  }
+  nodes.notices.replaceChildren(
+    ...notices.map(notice => {
+      const mine = noticeMatches(notice);
+      const badges = [el('span', { text: t(`kind.${noticeKind(notice)}`), className: 'badge' })];
+      if (mine) badges.push(el('span', { text: t('notices.mine'), className: 'badge mine' }));
+      return el('article', { className: `notice${mine ? ' mine' : ''}` }, [
+        el('div', { className: 'closure-head' }, [
+          el('strong', { text: notice.title }),
+          el('span', { className: 'row' }, badges),
+        ]),
+        el('p', { text: dayHeading(noticeEpoch(notice)), className: 'muted' }),
+        noticeBody(notice),
+      ]);
+    }),
   );
 }
 
@@ -377,6 +486,7 @@ function renderAll() {
   renderMenuValues();
   renderZonePicker();
   renderWatchList();
+  renderNotices();
   renderClosures();
   renderZones();
   renderAlertsState();
@@ -540,6 +650,7 @@ async function enableAlerts() {
     applicationServerKey: urlBase64ToBytes(publicKey),
   });
   await syncSubscription();
+  trackEvent('enable_alerts');
   renderAll();
 }
 
@@ -572,6 +683,7 @@ nodes.alertsToggle.addEventListener('click', () => toggleAlerts(state.subscripti
 
 function changeLanguage(lang) {
   setLanguage(lang);
+  trackEvent('change_language', { language: lang });
   state.alertsMessage = '';
   applyStaticTexts();
   renderAll();
@@ -631,11 +743,44 @@ function loadDataQuietly() {
   });
 }
 
+function visitorId() {
+  try {
+    let id = localStorage.getItem(VISITOR_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(VISITOR_KEY, id);
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+function trackVisit() {
+  try {
+    if (sessionStorage.getItem(SESSION_KEY)) return;
+    sessionStorage.setItem(SESSION_KEY, '1');
+  } catch {
+    return;
+  }
+  const visitor = visitorId();
+  if (!visitor) return;
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  fetch('/api/hit', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ visitor, lang: getLanguage(), standalone }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 async function init() {
   history.replaceState({ screen: screenFromHash(), depth: 0 }, '', location.href);
   showScreen(screenFromHash());
   applyStaticTexts();
   renderAll();
+  initAnalytics();
+  trackVisit();
   await loadDataQuietly();
   if (pushSupported() && !isIosBrowserTab()) {
     const registration = await navigator.serviceWorker.register('/sw.js');

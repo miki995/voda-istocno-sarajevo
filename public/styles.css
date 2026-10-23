@@ -162,6 +162,7 @@ button.menu-row:active { background: rgba(0, 0, 0, 0.06); }
 .tile-blue { background: linear-gradient(180deg, #3d9bff, var(--blue)); }
 .tile-teal { background: linear-gradient(180deg, #5ad0e6, var(--teal)); }
 .tile-purple { background: linear-gradient(180deg, #c97cf0, var(--purple)); }
+.tile-red { background: linear-gradient(180deg, #ff6b61, var(--red)); }
 .tile-gray { background: linear-gradient(180deg, #a1a1a6, #8e8e93); }
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -325,3 +326,14 @@ input[type='search']:focus { outline: none; box-shadow: var(--focus); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+.notice-card .home-card-title { font-size: 1.3rem; }
+.notice-body { margin-top: 12px; display: grid; gap: 8px; font-size: 0.94rem; }
+.notice-body p { margin: 0; }
+.home-link { display: block; width: 100%; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.home-link .home-card-title { font-size: 1.15rem; color: var(--text); }
+.home-link.tone-warn .home-card-title { color: var(--orange-text); }
+.notice { border-radius: 20px; padding: 18px; background: var(--surface); margin-bottom: 12px; }
+.notice.mine { background: var(--orange-tint); }
+.notice .closure-head { margin-bottom: 4px; }
+.notice-card .home-card-detail { font-size: 0.94rem; font-weight: 400; color: var(--text); }

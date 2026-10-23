@@ -9,3 +9,8 @@ export function fold(value) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+export function mentions(text, needle) {
+  const folded = fold(needle);
+  return folded.length >= 3 && ` ${fold(text)} `.includes(` ${folded} `);
+}

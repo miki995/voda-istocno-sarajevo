@@ -1,15 +1,18 @@
 import { buildPushPayload } from '@block65/webcrypto-web-push';
-import { parseCalendarEvents, selectUpcomingPlanEvents } from './events.js';
+import { parseCalendarEvents, selectRecentNoticeEvents, selectUpcomingPlanEvents } from './events.js';
+import { extrasToNotices, parseNotice } from './notices.js';
 import { mergePlacesByZone, parsePlan } from './parser.js';
 import { dayKey } from './time.js';
 import { normalizeLanguage } from './messages.js';
-import { planNotifications, pruneSent } from './notify.js';
+import { noticeNotifications, planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
 import zonesSeed from './zones-seed.json' with { type: 'json' };
 
 const SOURCE_URL = 'https://vikis.info/';
 const EVENT_URL = 'https://vikis.info/sr/event/show/';
 const UPCOMING_REFRESH_MS = 30 * 60 * 1000;
+const NOTICES_REFRESH_MS = 10 * 60 * 1000;
+const MAX_NOTICES = 12;
 const MAX_WATCHES = 30;
 const ZONES = ['I', 'II', 'III'];
 const SUBS_SET = 'subs';
@@ -50,7 +53,8 @@ export function isValidSubscription(subscription) {
 }
 
 export async function loadPlan(store) {
-  return (await store.get('plan')) ?? { fetchedAt: 0, status: '', closures: [] };
+  const plan = (await store.get('plan')) ?? { fetchedAt: 0, status: '', closures: [] };
+  return { ...plan, notices: plan.notices ?? [] };
 }
 
 export async function loadZonePlaces(store) {
@@ -71,23 +75,49 @@ function reportUnparsed(headers) {
   }
 }
 
-async function loadUpcomingClosures(store, homeHtml, now) {
+async function loadUpcoming(store, homeHtml, now) {
   const events = selectUpcomingPlanEvents(parseCalendarEvents(homeHtml), dayKey(now));
   const idsKey = events.map(event => event.id).join(',');
   const cached = await store.get('upcoming');
-  if (cached && cached.idsKey === idsKey && now - cached.fetchedAt < UPCOMING_REFRESH_MS) {
-    return cached.closures;
+  const cachedGroup = cached && { closures: cached.closures, extras: cached.extras ?? [] };
+  if (cached && cached.idsKey === idsKey && cached.extras && now - cached.fetchedAt < UPCOMING_REFRESH_MS) {
+    return cachedGroup;
   }
   const results = await Promise.allSettled(events.map(event => fetchText(`${EVENT_URL}${event.id}`)));
   const failed = results.some(result => result.status === 'rejected');
   if (failed && cached) {
-    return cached.closures;
+    return cachedGroup;
   }
-  const pages = results.filter(result => result.status === 'fulfilled').map(result => parsePlan(result.value));
-  pages.forEach(page => reportUnparsed(page.unparsedHeaders));
-  const closures = pages.flatMap(page => page.closures);
-  await store.set('upcoming', { idsKey, fetchedAt: now, closures });
-  return closures;
+  const pages = results.flatMap((result, index) => (result.status === 'fulfilled' ? [{ event: events[index], page: parsePlan(result.value) }] : []));
+  pages.forEach(({ page }) => reportUnparsed(page.unparsedHeaders));
+  const closures = pages.flatMap(({ page }) => page.closures);
+  const extras = pages.flatMap(({ event, page }) => extrasToNotices(page.extras, event.date, event.id));
+  await store.set('upcoming', { idsKey, fetchedAt: now, closures, extras });
+  return { closures, extras };
+}
+
+async function loadNotices(store, homeHtml, now) {
+  const events = selectRecentNoticeEvents(parseCalendarEvents(homeHtml), dayKey(now)).slice(0, MAX_NOTICES);
+  const idsKey = events.map(event => event.id).join(',');
+  const cached = await store.get('notices');
+  if (cached && cached.idsKey === idsKey && now - cached.fetchedAt < NOTICES_REFRESH_MS) {
+    return cached.notices;
+  }
+  const known = new Map((cached?.notices ?? []).map(notice => [notice.id, notice]));
+  const results = await Promise.allSettled(
+    events.map(async event => known.get(`notice-${event.id}`) ?? parseNotice(event, await fetchText(`${EVENT_URL}${event.id}`))),
+  );
+  const notices = results.filter(result => result.status === 'fulfilled').map(result => result.value);
+  if (notices.length < events.length && cached) {
+    return cached.notices;
+  }
+  await store.set('notices', { idsKey, fetchedAt: now, notices });
+  return notices;
+}
+
+function mergeNotices(...groups) {
+  const byId = new Map(groups.flat().map(notice => [notice.id, notice]));
+  return [...byId.values()].sort((first, second) => second.date.localeCompare(first.date));
 }
 
 function mergeClosures(...groups) {
@@ -104,13 +134,16 @@ export async function refreshPlan(store, now) {
   const homeHtml = await fetchText(SOURCE_URL);
   const parsed = parsePlan(homeHtml);
   reportUnparsed(parsed.unparsedHeaders);
-  const upcoming = await loadUpcomingClosures(store, homeHtml, now).catch(() => []);
-  const closures = mergeClosures(parsed.closures, upcoming);
+  const upcoming = await loadUpcoming(store, homeHtml, now).catch(() => ({ closures: [], extras: [] }));
+  const closures = mergeClosures(parsed.closures, upcoming.closures);
   const previous = await loadPlan(store);
+  const published = await loadNotices(store, homeHtml, now).catch(() => previous.notices.filter(notice => notice.id.startsWith('notice-')));
+  const notices = mergeNotices(extrasToNotices(parsed.extras, dayKey(now), 'home'), upcoming.extras, published);
   const closuresChanged = JSON.stringify(previous.closures) !== JSON.stringify(closures);
-  const plan = { fetchedAt: now, status: parsed.status, closures };
+  const noticesChanged = JSON.stringify(previous.notices) !== JSON.stringify(notices);
+  const plan = { fetchedAt: now, status: parsed.status, closures, notices };
 
-  if (closuresChanged || now - previous.fetchedAt > HOUR_MS) {
+  if (closuresChanged || noticesChanged || now - previous.fetchedAt > HOUR_MS) {
     await store.set('plan', plan);
   }
   if (closuresChanged) {
@@ -134,13 +167,10 @@ async function notifySubscriber(store, env, plan, now, id) {
     await store.srem(SUBS_SET, id);
     return 0;
   }
-  const notifications = planNotifications({
-    closures: plan.closures,
-    watches: record.watches,
-    sent: record.sent,
-    now,
-    lang: record.lang,
-  });
+  const notifications = [
+    ...planNotifications({ closures: plan.closures, watches: record.watches, sent: record.sent, now, lang: record.lang }),
+    ...noticeNotifications({ notices: plan.notices, watches: record.watches, sent: record.sent, now, lang: record.lang }),
+  ];
   let delivered = 0;
   for (const notification of notifications) {
     const response = await sendPush(env, record.subscription, {
@@ -159,7 +189,7 @@ async function notifySubscriber(store, env, plan, now, id) {
       delivered += 1;
     }
   }
-  const prunedSent = pruneSent(record.sent, plan.closures);
+  const prunedSent = pruneSent(record.sent, [...plan.closures, ...plan.notices]);
   if (delivered > 0 || prunedSent.length !== record.sent.length) {
     await store.set(subKey(id), { ...record, sent: prunedSent });
   }
@@ -179,7 +209,7 @@ export async function runCron(store, env, now = Date.now()) {
     return loadPlan(store);
   });
   const delivered = await dispatchNotifications(store, env, plan, now);
-  return { closures: plan.closures.length, delivered, planError };
+  return { closures: plan.closures.length, notices: plan.notices.length, delivered, planError };
 }
 
 export async function saveSubscription(store, subscription, rawWatches, lang) {
@@ -187,7 +217,10 @@ export async function saveSubscription(store, subscription, rawWatches, lang) {
   const id = await subscriptionId(subscription.endpoint);
   const existing = await store.get(subKey(id));
   const plan = await loadPlan(store);
-  const alreadyKnown = plan.closures.map(closure => `${closure.id}|PUBLISHED`);
+  const alreadyKnown = [
+    ...plan.closures.map(closure => `${closure.id}|PUBLISHED`),
+    ...plan.notices.map(notice => `${notice.id}|NOTICE`),
+  ];
   const sent = [...new Set([...(existing?.sent ?? []), ...alreadyKnown])];
   await store.set(subKey(id), { subscription, watches, sent, lang: normalizeLanguage(lang) });
   await store.sadd(SUBS_SET, id);

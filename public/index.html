@@ -57,6 +57,14 @@
         </button>
       </li>
       <li>
+        <button class="menu-row" type="button" data-nav="notices">
+          <span class="tile tile-red" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+          <span class="menu-label" data-i18n="menu.notices">Obavještenja vodovoda</span>
+          <span id="menu-notices-value" class="menu-value"></span>
+          <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </li>
+      <li>
         <button class="menu-row" type="button" data-nav="plan">
           <span class="tile tile-teal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.4 0z"/></svg></span>
           <span class="menu-label" data-i18n="menu.plan">Cijeli plan redukcije</span>
@@ -122,6 +130,20 @@
     </div>
   </section>
 
+  <section id="screen-notices" class="screen" data-screen="notices" hidden>
+    <header class="nav">
+      <button class="nav-back" type="button" data-nav-back>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        <span data-i18n="nav.back">Nazad</span>
+      </button>
+      <h2 data-i18n="menu.notices">Obavještenja vodovoda</h2>
+    </header>
+    <div class="panel">
+      <p class="muted" data-i18n="notices.help">Kvarovi, radovi i najave isključenja koje vodovod objavi van redovnog plana.</p>
+      <div id="notices"></div>
+    </div>
+  </section>
+
   <section id="screen-plan" class="screen" data-screen="plan" hidden>
     <header class="nav">
       <button class="nav-back" type="button" data-nav-back>
@@ -149,6 +171,8 @@
     </div>
   </section>
 
+  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+  <script defer src="/_vercel/insights/script.js"></script>
   <script src="/app.js" type="module"></script>
 </body>
 </html>

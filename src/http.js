@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+
 const MAX_BODY_CHARS = 8192;
 
 export function sendJson(res, status, body) {
@@ -20,4 +22,14 @@ export function readBody(req) {
     }
   }
   return null;
+}
+
+export function isAuthorized(req) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return false;
+  }
+  const given = Buffer.from(req.headers.authorization ?? '');
+  const expected = Buffer.from(`Bearer ${secret}`);
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }

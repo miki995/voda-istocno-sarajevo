@@ -1,5 +1,5 @@
 import { DEFAULT_LANGUAGE, messagesFor } from './messages.js';
-import { fold } from './text.js';
+import { mentions } from './text.js';
 import { dayKey, formatDay, formatEndTime, formatTime, localParts } from './time.js';
 
 export const LEAD_MS = 2 * 60 * 60 * 1000;
@@ -8,7 +8,6 @@ export const MORNING_HOUR = 7;
 const KIND_PRIORITY = ['SOON', 'MORNING', 'PUBLISHED'];
 
 export function matchedWatches(closure, watches, lang = DEFAULT_LANGUAGE) {
-  const haystack = ` ${fold(closure.text)} `;
   const labels = [];
   for (const watch of watches) {
     if (watch.kind === 'ZONE') {
@@ -16,8 +15,7 @@ export function matchedWatches(closure, watches, lang = DEFAULT_LANGUAGE) {
         labels.push(messagesFor(lang).zone(watch.value));
       }
     } else {
-      const needle = fold(watch.value);
-      if (needle.length >= 3 && haystack.includes(needle)) {
+      if (mentions(closure.text, watch.value)) {
         labels.push(watch.value);
       }
     }
@@ -78,7 +76,29 @@ export function planNotifications({ closures, watches, sent, now, lang = DEFAULT
   return notifications;
 }
 
-export function pruneSent(sent, closures) {
-  const knownIds = new Set(closures.map(closure => closure.id));
+const NOTICE_SUMMARY_LENGTH = 140;
+
+export function noticeNotifications({ notices, watches, sent, now, lang = DEFAULT_LANGUAGE }) {
+  const messages = messagesFor(lang);
+  const today = dayKey(now);
+  return notices
+    .filter(notice => notice.date >= today && !sent.includes(`${notice.id}|NOTICE`))
+    .flatMap(notice => {
+      const labels = matchedWatches(notice, watches, lang);
+      if (labels.length === 0) {
+        return [];
+      }
+      const summary = notice.text.length > NOTICE_SUMMARY_LENGTH ? `${notice.text.slice(0, NOTICE_SUMMARY_LENGTH).trim()}…` : notice.text;
+      return [{
+        tag: notice.id,
+        markSent: [`${notice.id}|NOTICE`],
+        title: (messages.notice[notice.kind] ?? messages.notice.breakdown)(labels.join(', ')),
+        body: summary,
+      }];
+    });
+}
+
+export function pruneSent(sent, items) {
+  const knownIds = new Set(items.map(item => item.id));
   return sent.filter(entry => knownIds.has(entry.split('|')[0]));
 }
