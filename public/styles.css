@@ -402,5 +402,17 @@ button.wg-head:focus-visible { outline: none; box-shadow: var(--focus); }
 .week-grid:not(.single) .wg-cell { background: var(--surface); background: color-mix(in srgb, var(--zone) 12%, #fff); }
 .week-grid:not(.single) .wg-cell.empty { background: var(--surface); }
 .week-grid:not(.single) .wg-cell.mine { background: color-mix(in srgb, var(--zone) 26%, #fff); box-shadow: inset 0 0 0 2px var(--zone); }
-.wg-cell.live::after { content: ''; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #1d1d1f; }
+.wg-cell.live { padding-top: 18px; }
+.wg-cell.live::after { content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 8px; height: 8px; border-radius: 50%; background: #1d1d1f; }
 button.wg-head { border-radius: 0; text-decoration: none; padding: 6px 2px 5px; border-bottom: 3px solid var(--zone); }
+
+.week-grid:not(.single) .wg-cell span { white-space: nowrap; }
+@media (max-width: 420px) {
+  .week-grid:not(.single) { grid-template-columns: 62px repeat(3, 1fr); gap: 4px; font-size: 0.72rem; }
+  .week-grid:not(.single) .wg-cell { padding-left: 2px; padding-right: 2px; border-radius: 9px; }
+  .week-grid:not(.single) .wg-day { font-size: 0.72rem; }
+}
+@media (max-width: 345px) {
+  .week-grid:not(.single) { font-size: 0.66rem; }
+  .week-grid:not(.single) .wg-day { font-size: 0.68rem; }
+}
