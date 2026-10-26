@@ -7,7 +7,7 @@ import { toLatin } from './translit.js';
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
-const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'map', 'settings'];
+const SCREENS = ['home', 'menu', 'add', 'notices', 'plan', 'map', 'settings'];
 const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
 const TEXT_KEY = 'voda-text';
 const STALE_SOURCE_MS = 3 * 60 * 60 * 1000;
@@ -46,7 +46,6 @@ const nodes = {
   homeContent: document.getElementById('home-content'),
   menuButton: document.getElementById('menu-button'),
   menuAddValue: document.getElementById('menu-add-value'),
-  menuAlertsValue: document.getElementById('menu-alerts-value'),
   menuNoticesValue: document.getElementById('menu-notices-value'),
   notices: document.getElementById('notices'),
   languageSwitch: document.getElementById('language-switch'),
@@ -55,7 +54,6 @@ const nodes = {
   alertsHint: document.getElementById('alerts-hint'),
   searchInput: document.getElementById('search-input'),
   suggestions: document.getElementById('suggestions'),
-  zonePicker: document.getElementById('zone-picker'),
   watchList: document.getElementById('watch-list'),
   watchEmpty: document.getElementById('watch-empty'),
   addDone: document.getElementById('add-done'),
@@ -455,7 +453,7 @@ function renderBanner() {
         text: t('home.bannerButton'),
         className: 'btn primary small',
         attrs: { type: 'button' },
-        onClick: () => (mode === 'ios' ? navigate('alerts') : startEnableAlerts()),
+        onClick: () => (mode === 'ios' ? navigate('settings') : startEnableAlerts()),
       }),
     ]),
   );
@@ -463,7 +461,6 @@ function renderBanner() {
 
 function renderMenuValues() {
   nodes.menuAddValue.textContent = state.watches.length > 0 ? t('menu.selected', { count: state.watches.length }) : '';
-  nodes.menuAlertsValue.textContent = state.subscription ? t('menu.on') : t('menu.off');
   nodes.menuNoticesValue.textContent = noticeList().length > 0 ? String(noticeList().length) : '';
 }
 
@@ -475,19 +472,6 @@ function renderLanguageSwitch() {
         className: 'lang-btn',
         attrs: { type: 'button', 'aria-pressed': String(getLanguage() === lang), lang: lang === 'sr' ? 'sr-Cyrl' : lang },
         onClick: () => changeLanguage(lang),
-      }),
-    ),
-  );
-}
-
-function renderZonePicker() {
-  nodes.zonePicker.replaceChildren(
-    ...ZONE_NAMES.map(zone =>
-      el('button', {
-        text: t('zone', { zone }),
-        className: 'zone-btn',
-        attrs: { type: 'button', 'aria-pressed': String(hasWatch('ZONE', zone)) },
-        onClick: () => toggleWatch('ZONE', zone),
       }),
     ),
   );
@@ -583,7 +567,6 @@ function renderAll() {
   renderUpdated();
   renderHome();
   renderMenuValues();
-  renderZonePicker();
   renderWatchList();
   renderNotices();
   renderClosures();

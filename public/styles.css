@@ -354,3 +354,4 @@ html[data-text='xlarge'] { font-size: 136%; }
 .link-btn:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
 .all-times .link-btn { margin-left: 8px; font-size: 0.88rem; padding: 0; }
 #locate-results .place { background: var(--surface); }
+#screen-settings .panel { margin-top: 20px; }
