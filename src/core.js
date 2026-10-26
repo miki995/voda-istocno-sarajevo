@@ -73,12 +73,16 @@ async function fetchText(url) {
 }
 
 // The site is read by pattern, so a changed layout shows up as a page we can no longer make sense of.
-function findProblem(homeHtml, parsed) {
+function findProblem(homeHtml, parsed, notices = []) {
   if (parsed.unparsedHeaders.length > 0) {
     return { kind: 'unparsed-header', detail: ['Zaglavlja koja parser ne razumije:', ...parsed.unparsedHeaders].join('\n') };
   }
   if (parseCalendarEvents(homeHtml).length === 0 && parsed.closures.length === 0) {
     return { kind: 'layout-changed', detail: 'Na početnoj stranici nema ni kalendara ni plana redukcije. Moguće je da se promijenio izgled sajta.' };
+  }
+  const unreadable = notices.filter(notice => notice.id.startsWith('notice-') && notice.lines.length === 0);
+  if (unreadable.length > 0) {
+    return { kind: 'notice-unreadable', detail: `Ne mogu da pročitam tekst ${unreadable.length} obavještenja (promijenila se struktura stranice obavještenja?):\n${unreadable.map(notice => `${notice.date} ${notice.title} (${notice.id})`).join('\n')}` };
   }
   return null;
 }
@@ -117,7 +121,8 @@ async function loadNotices(store, homeHtml, now) {
   if (cached && cached.idsKey === idsKey && now - cached.fetchedAt < NOTICES_REFRESH_MS) {
     return cached.notices;
   }
-  const known = new Map((cached?.notices ?? []).map(notice => [notice.id, notice]));
+  // A notice that was read with no text is fetched again, so a fixed parser clears the alert instead of waiting for it to age out.
+  const known = new Map((cached?.notices ?? []).filter(notice => notice.lines.length > 0).map(notice => [notice.id, notice]));
   const results = await Promise.allSettled(
     events.map(async event => known.get(`notice-${event.id}`) ?? parseNotice(event, await fetchText(`${EVENT_URL}${event.id}`))),
   );
@@ -157,7 +162,7 @@ export async function refreshPlan(store, now) {
   const noticesChanged = JSON.stringify(previous.notices) !== JSON.stringify(notices);
   const plan = { fetchedAt: now, status: parsed.status, closures, notices };
   await recordHistory(store, closures, now).catch(error => console.error('history not saved', error.message));
-  const problem = findProblem(homeHtml, parsed);
+  const problem = findProblem(homeHtml, parsed, notices);
 
   if (closuresChanged || noticesChanged || now - previous.fetchedAt > HOUR_MS) {
     await store.set('plan', plan);

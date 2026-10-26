@@ -3,10 +3,10 @@ const PERSIST_MS = 30 * 60 * 1000;
 const REPEAT_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_RECIPIENT = 'miroslavmaksimovic95@gmail.com';
 
-async function sendMail(env, subject, text) {
+async function deliver(env, subject, text) {
   if (!env.RESEND_API_KEY) {
     console.error('RESEND_API_KEY is not set, cannot send:', subject);
-    return false;
+    return { ok: false, status: 0, detail: 'RESEND_API_KEY nije podešen na serveru' };
   }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -21,7 +21,15 @@ async function sendMail(env, subject, text) {
   if (!response.ok) {
     console.error('mail was not accepted', response.status);
   }
-  return response.ok;
+  return { ok: response.ok, status: response.status, detail: response.ok ? 'poslato' : (await response.text()).slice(0, 300) };
+}
+
+async function sendMail(env, subject, text) {
+  return (await deliver(env, subject, text)).ok;
+}
+
+export async function sendTestMail(env, now = Date.now()) {
+  return deliver(env, '[Voda ISA] Probni mejl', `Ovo je probni mejl iz aplikacije Voda ISA, poslat ${new Date(now).toISOString()}.\nAko ga vidiš, upozorenja o problemu s izvorom podataka stižu na ovu adresu.`);
 }
 
 // Mails only when the same problem has lasted half an hour (so a blip is ignored) and at most once a day,

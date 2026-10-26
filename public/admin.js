@@ -82,3 +82,17 @@ try {
   const saved = sessionStorage.getItem(TOKEN_KEY);
   if (saved) load(saved);
 } catch { /* no saved key */ }
+
+document.getElementById('test-mail').addEventListener('click', async () => {
+  const result = document.getElementById('test-result');
+  let token = tokenInput.value.trim();
+  try { token ||= sessionStorage.getItem(TOKEN_KEY) ?? ''; } catch { /* no saved key */ }
+  if (!token) {
+    result.textContent = 'Prvo upiši ključ i pritisni Prikaži.';
+    return;
+  }
+  result.textContent = 'Šaljem…';
+  const response = await fetch('/api/test-alert', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => ({}));
+  result.textContent = response.ok ? 'Probni mejl je poslat. Provjeri inbox (i spam).' : `Nije poslato: ${body.detail ?? body.error ?? response.status}`;
+});
