@@ -7,7 +7,6 @@ import { normalizeLanguage } from './messages.js';
 import { eveningNotifications, limitNotifications, noticeNotifications, planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
 import { checkHealth } from './health.js';
-import { recordHistory } from './history.js';
 import { recordCron, recordPush } from './stats.js';
 import zonesSeed from './zones-seed.json' with { type: 'json' };
 
@@ -161,7 +160,6 @@ export async function refreshPlan(store, now) {
   const closuresChanged = JSON.stringify(previous.closures) !== JSON.stringify(closures);
   const noticesChanged = JSON.stringify(previous.notices) !== JSON.stringify(notices);
   const plan = { fetchedAt: now, status: parsed.status, closures, notices };
-  await recordHistory(store, closures, now).catch(error => console.error('history not saved', error.message));
   const problem = findProblem(homeHtml, parsed, notices);
 
   if (closuresChanged || noticesChanged || now - previous.fetchedAt > HOUR_MS) {

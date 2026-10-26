@@ -26,7 +26,7 @@ Also: an install popup shown once on the home screen after a street is added (an
 - `/api/cron` reads vikis.info, extracts the closures (zone, time window, neighbourhoods and streets) and notices, stores them in Redis and sends the push notifications that are due. Plans for the next 7 days are read from the calendar of the home page (`/sr/event/show/{id}`) and refreshed every 30 minutes or when the list changes; notices from the last 14 days are kept.
 - A subscription is a device with a list of watches (a street, or a whole zone for older subscriptions). Each subscriber has a `sent` list so nothing is sent twice.
 - Notifications per street, at most one per kind per closure: **published** (when the plan appears), **morning** (after 07:00 on the day), **soon** (about 2 hours before), **evening** (after 20:00, one message with everything closed tomorrow), **restored** (up to 2 hours after a closure ends, but not when another one for the same street follows right away) and **notice** (once, when a notice mentions the street). If more than three are due at once for one person (for example after the checker was down) the two most urgent are sent and the rest become one "N more new alerts" message.
-- The street list per zone grows with every plan the site sees (`/api/zones`); the first list is `src/zones-seed.json`. Every closure ever seen is kept for 60 days (`/api/history`).
+- The street list per zone grows with every plan the site sees (`/api/zones`); the first list is `src/zones-seed.json`.
 - **Light on Redis:** all subscribers are read with one `MGET` per 200 and notified in groups of 25 within a 22-second budget (the rest waits for the next run, in shuffled order).
 
 ## Keeping it running
@@ -47,8 +47,8 @@ Also: an install popup shown once on the home screen after a street is added (an
 ## Project layout
 
 ```
-api/        Vercel functions: plan, zones, history, vapid, subscribe, unsubscribe, hit, cron, stats, test-alert, contact
-src/        parser, calendar events, notices, notification planning, history, health checks and mail, rate limits, storage, messages (sr/en)
+api/        Vercel functions: plan, zones, vapid, subscribe, unsubscribe, hit, cron, stats, test-alert, contact
+src/        parser, calendar events, notices, notification planning, health checks and mail, rate limits, storage, messages (sr/en)
 public/     the app: index.html, app.js, i18n.js, translit.js, map.js, calendar.js, share-image.js, status-art.js, contact-rules.js,
             service worker (sw.js), manifest, places.json (map coordinates), admin page, link-preview image
 scripts/    VAPID keys, zone seeding, geocoding of the streets, local dev server
