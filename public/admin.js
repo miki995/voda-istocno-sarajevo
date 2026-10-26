@@ -38,6 +38,7 @@ function render(stats) {
     card('Pushova 7 dana: poslato', String(sum('pushOk'))),
     card('Pushova 7 dana: neuspjelo', String(sum('pushFailed')), sum('pushFailed') > 0 ? 'bad' : ''),
     card('Uklonjeno (odjavljeni uređaji)', String(sum('pushGone'))),
+    card('Otvaranja u Instagram/FB pregledniku (7 dana)', String(sum('inApp'))),
   );
   const head = ['Dan', 'Posjetioci', 'Otvaranja', 'Sa ekrana', 'ЋИР', 'LAT', 'EN', 'Push ok', 'Push greška'];
   const rows = stats.days.map(day => [day.day, day.visitors, day.opens, day.appOpens, day.sr, day.srLatn, day.en, day.pushOk, day.pushFailed]);
@@ -51,6 +52,8 @@ function render(stats) {
     grid.append(tr);
   });
   table.replaceChildren(grid);
+  const sourceList = document.getElementById('sources');
+  sourceList.replaceChildren(...(stats.sources ?? []).map(item => el('li', `${item.source} – ${item.visits}`)));
   top.replaceChildren(...stats.topWatches.map(item => el('li', `${item.watch} – ${item.subscribers}`)));
 }
 

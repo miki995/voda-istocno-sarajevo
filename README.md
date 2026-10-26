@@ -27,6 +27,10 @@ The site is available in Serbian (default in Cyrillic, with a Latin option in th
 - **Status page:** `/admin.html` asks for `CRON_SECRET` and shows subscribers, last cron run, source problems and push delivery (ok / failed / removed devices).
 - **Source alerts by e-mail:** set `RESEND_API_KEY` (and optionally `ALERT_EMAIL`, `ALERT_FROM`). A mail is sent when vikis.info cannot be read or understood for 30 minutes, at most once a day.
 
+- **Where visitors come from:** share links as `https://your-site/?utm_source=instagram` (any short name); the status page lists visits per source. Instagram, Facebook and Viber open links in their own browser where alerts and installing do not work, so the home page asks those visitors to open the site in a real browser.
+- **Self-healing refresh:** GitHub delays or drops scheduled runs, so `/api/plan` refreshes the data itself when the last check is more than 10 minutes old (only the first visitor in each 5 minutes does it). For a steady schedule also add a free cron-job.org job: GET `$SITE_URL/api/cron` every 5 minutes with the header `Authorization: Bearer <CRON_SECRET>`. The `SITE_URL` repository secret must be the live domain (a redirecting domain makes the poll succeed without doing anything; the workflow now fails unless it gets a 200).
+- **Stale data notice:** shown only when the check itself fails (site cannot be read, layout changed, or no check for an hour), never just because there is no news.
+
 ## Usage statistics
 
 The app counts its own usage in Redis, with no cookies and no third-party service. Once per browser session it sends a random device id (kept in `localStorage`), the language and whether it was opened from the Home Screen to `/api/hit`. No IP address or user agent is stored. To read the numbers (30 days of unique visitors, opens, Home Screen opens, language split, number of subscribers and the ten most watched streets or zones):

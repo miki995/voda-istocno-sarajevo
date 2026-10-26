@@ -10,7 +10,7 @@ const TIME_ZONE = 'Europe/Sarajevo';
 const SCREENS = ['home', 'menu', 'add', 'notices', 'plan', 'map', 'settings'];
 const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
 const TEXT_KEY = 'voda-text';
-const STALE_SOURCE_MS = 3 * 60 * 60 * 1000;
+const CRON_SILENT_MS = 60 * 60 * 1000;
 const LOCATE_RADIUS_M = 1500;
 const INSTALL_KEY = 'voda-install-snoozed';
 const INSTALL_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -296,14 +296,20 @@ function pastSummary(watch) {
   return t('stats.last30', { count: hits.length, hours });
 }
 
+// "No news" is not a problem. The notice only appears when the check itself fails: the site cannot be read, or the check has stopped running.
+function sourceTrouble() {
+  const { checkedAt, problem } = state.plan;
+  if (!navigator.onLine || !checkedAt) return false;
+  return Date.now() - checkedAt > CRON_SILENT_MS || problem === 'fetch-failed' || problem === 'layout-changed';
+}
+
 function sourceNotice() {
-  const stale = state.plan.fetchedAt > 0 && Date.now() - state.plan.fetchedAt > STALE_SOURCE_MS && navigator.onLine;
-  if (!stale) return [];
+  if (!sourceTrouble()) return [];
   return [
     el('div', { className: 'banner' }, [
       iconTile('warn', 'red'),
       el('div', { className: 'banner-text' }, [
-        el('p', { text: t('source.stale', { time: timeFormat.format(state.plan.fetchedAt) }) }),
+        el('p', { text: t('source.stale', { time: timeFormat.format(state.plan.checkedAt) }) }),
         el('div', { className: 'card-actions' }, [
           el('a', { text: t('source.facebook'), className: 'link-btn', attrs: { href: 'https://www.facebook.com/vodovodistocnosarajevo/', rel: 'noopener' } }),
           el('a', { text: t('source.call'), className: 'link-btn', attrs: { href: 'tel:+38757342742' } }),
@@ -446,6 +452,10 @@ function alertsMode() {
 }
 
 function renderBanner() {
+  if (inAppBrowser()) {
+    renderInAppBanner();
+    return;
+  }
   const mode = alertsMode();
   if (state.subscription || (mode !== 'ready' && mode !== 'ios')) {
     nodes.homeBanner.replaceChildren();
@@ -562,7 +572,7 @@ function renderUpdated() {
     return;
   }
   const key = navigator.onLine ? 'plan.updated' : 'plan.offline';
-  nodes.updated.textContent = t(key, { time: timeFormat.format(state.plan.fetchedAt) });
+  nodes.updated.textContent = t(key, { time: timeFormat.format(state.plan.checkedAt || state.plan.fetchedAt) });
 }
 
 function renderAll() {
@@ -829,6 +839,35 @@ window.addEventListener('appinstalled', () => {
   trackEvent('install_app');
 });
 
+// Instagram, Facebook and similar apps open links in their own browser, where alerts and installing do not work.
+function inAppBrowser() {
+  return /Instagram|FBAN|FBAV|FB_IAB|Messenger|Viber|Line\//i.test(navigator.userAgent);
+}
+
+function renderInAppBanner() {
+  const android = /Android/i.test(navigator.userAgent);
+  const button = el('button', {
+    text: t(android ? 'inapp.openChrome' : 'inapp.copy'),
+    className: 'btn primary small',
+    attrs: { type: 'button' },
+    onClick: async event => {
+      if (android) {
+        location.href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;end`;
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(location.origin);
+        event.currentTarget.textContent = t('share.copied');
+      } catch {
+        event.currentTarget.textContent = location.host;
+      }
+    },
+  });
+  nodes.homeBanner.replaceChildren(
+    el('div', { className: 'banner' }, [iconTile('warn', 'orange'), el('p', { text: t('inapp.text'), className: 'banner-text' }), button]),
+  );
+}
+
 function isIosBrowserTab() {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
@@ -1049,6 +1088,12 @@ function visitorId() {
   }
 }
 
+// Links shared with ?utm_source=instagram (or any short name) show which post brings people.
+function visitSource() {
+  const source = new URLSearchParams(location.search).get('utm_source')?.toLowerCase() ?? '';
+  return /^[a-z0-9_-]{1,24}$/.test(source) ? source : null;
+}
+
 function trackVisit() {
   try {
     if (sessionStorage.getItem(SESSION_KEY)) return;
@@ -1062,7 +1107,7 @@ function trackVisit() {
   fetch('/api/hit', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ visitor, lang: getLanguage(), standalone }),
+    body: JSON.stringify({ visitor, lang: getLanguage(), standalone, source: visitSource(), inApp: inAppBrowser() }),
     keepalive: true,
   }).catch(() => {});
 }
