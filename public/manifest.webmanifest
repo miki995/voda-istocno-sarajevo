@@ -1,10 +1,10 @@
 {
-  "name": "Voda Istočno Sarajevo",
-  "short_name": "Voda ISA",
-  "description": "Obavještenja o nestanku vode u Istočnom Sarajevu",
+  "name": "Вода ИС · Источно Сарајево",
+  "short_name": "Вода ИС",
+  "description": "Обавјештења о нестанку воде у Источном Сарајеву",
   "start_url": "/",
   "display": "standalone",
-  "lang": "sr",
+  "lang": "sr-Cyrl",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
