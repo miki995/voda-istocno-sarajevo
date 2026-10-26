@@ -45,7 +45,7 @@
       <li>
         <button class="menu-row" type="button" data-nav="add">
           <span class="tile tile-blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-          <span class="menu-label" data-i18n="menu.add">Moje ulice i zone</span>
+          <span class="menu-label" data-i18n="menu.add">Moje ulice</span>
           <span id="menu-add-value" class="menu-value"></span>
           <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
@@ -117,6 +117,7 @@
         <button id="alerts-toggle" class="btn primary" type="button" data-i18n="alerts.enable">Uključi obavještenja</button>
       </div>
       <p id="alerts-hint" class="hint" hidden></p>
+      <button id="install-button" class="btn wide" type="button" data-i18n="install.button" hidden>Instaliraj aplikaciju</button>
     </div>
   </section>
 
@@ -126,7 +127,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         <span data-i18n="nav.back">Nazad</span>
       </button>
-      <h2 data-i18n="menu.add">Moje ulice i zone</h2>
+      <h2 data-i18n="menu.add">Moje ulice</h2>
     </header>
     <div class="panel">
       <p class="muted" data-i18n="watch.help">Dobijaš poruku čim se plan objavi, ujutru na dan zatvaranja i oko 2 sata prije nego što voda nestane.</p>
@@ -191,6 +192,15 @@
     </div>
   </section>
 
+
+  <aside id="install-sheet" class="sheet" role="dialog" aria-labelledby="install-title" hidden>
+    <h2 id="install-title" data-i18n="install.title">Dodaj na početni ekran</h2>
+    <p id="install-text" class="muted"></p>
+    <div class="row">
+      <button id="install-go" class="btn primary" type="button"></button>
+      <button id="install-later" class="btn" type="button" data-i18n="install.later">Ne sada</button>
+    </div>
+  </aside>
 
   <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
   <script defer src="/_vercel/insights/script.js"></script>

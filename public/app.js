@@ -12,6 +12,8 @@ const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
 const TEXT_KEY = 'voda-text';
 const STALE_SOURCE_MS = 3 * 60 * 60 * 1000;
 const LOCATE_RADIUS_M = 1500;
+const INSTALL_KEY = 'voda-install-snoozed';
+const INSTALL_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOME_NOTICE_DAYS = 3;
 const VISITOR_KEY = 'voda-visitor';
@@ -62,6 +64,11 @@ const nodes = {
   locateButton: document.getElementById('locate-button'),
   locateMessage: document.getElementById('locate-message'),
   locateHint: document.getElementById('locate-hint'),
+  installSheet: document.getElementById('install-sheet'),
+  installText: document.getElementById('install-text'),
+  installGo: document.getElementById('install-go'),
+  installLater: document.getElementById('install-later'),
+  installButton: document.getElementById('install-button'),
   locateResults: document.getElementById('locate-results'),
   zoneMapBox: document.getElementById('zone-map'),
   mapLegend: document.getElementById('map-legend'),
@@ -440,20 +447,19 @@ function alertsMode() {
 
 function renderBanner() {
   const mode = alertsMode();
-  const needsBanner = state.watches.length > 0 && !state.subscription && (mode === 'ready' || mode === 'ios');
-  if (!needsBanner) {
+  if (state.subscription || (mode !== 'ready' && mode !== 'ios')) {
     nodes.homeBanner.replaceChildren();
     return;
   }
   nodes.homeBanner.replaceChildren(
     el('div', { className: 'banner' }, [
       iconTile('bell', 'orange'),
-      el('p', { text: t('home.bannerText'), className: 'banner-text' }),
+      el('p', { text: t(mode === 'ios' ? 'alerts.ios' : 'home.bannerText'), className: 'banner-text' }),
       el('button', {
-        text: t('home.bannerButton'),
+        text: t(mode === 'ios' ? 'install.how' : 'home.bannerButton'),
         className: 'btn primary small',
         attrs: { type: 'button' },
-        onClick: () => (mode === 'ios' ? navigate('settings') : startEnableAlerts()),
+        onClick: () => (mode === 'ios' ? showInstallSheet() : startEnableAlerts()),
       }),
     ]),
   );
@@ -571,6 +577,7 @@ function renderAll() {
   renderNotices();
   renderClosures();
   renderAlertsState();
+  renderInstallButton();
 }
 
 function allSuggestions(query) {
@@ -745,6 +752,83 @@ async function locateOnMap() {
 nodes.locateButton.addEventListener('click', locateMe);
 nodes.mapLocate.addEventListener('click', locateOnMap);
 
+let installPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function installMode() {
+  if (isStandalone()) return null;
+  if (installPrompt) return 'prompt';
+  return isIosBrowserTab() ? 'ios' : null;
+}
+
+function installSnoozed() {
+  try {
+    const at = Number(localStorage.getItem(INSTALL_KEY));
+    return at > 0 && Date.now() - at < INSTALL_SNOOZE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function showInstallSheet() {
+  const mode = installMode();
+  if (!mode) return;
+  nodes.installText.textContent = t(mode === 'ios' ? 'install.iosText' : 'install.text');
+  nodes.installGo.textContent = t(mode === 'ios' ? 'install.gotIt' : 'install.button');
+  nodes.installSheet.hidden = false;
+}
+
+function hideInstallSheet(snooze) {
+  nodes.installSheet.hidden = true;
+  if (!snooze) return;
+  try {
+    localStorage.setItem(INSTALL_KEY, String(Date.now()));
+  } catch {
+    return;
+  }
+}
+
+// The offer appears on the home screen, once the person has picked a street, and not again for two weeks after "Not now".
+function maybeOfferInstall() {
+  if (installMode() && !installSnoozed() && state.watches.length > 0 && screenFromHash() === 'home') showInstallSheet();
+}
+
+async function runInstall() {
+  if (installMode() === 'prompt') {
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installPrompt = null;
+    trackEvent('install_choice', { outcome: choice.outcome });
+    hideInstallSheet(choice.outcome !== 'accepted');
+  } else {
+    hideInstallSheet(true);
+  }
+  renderInstallButton();
+}
+
+function renderInstallButton() {
+  nodes.installButton.hidden = !installMode();
+}
+
+nodes.installGo.addEventListener('click', runInstall);
+nodes.installLater.addEventListener('click', () => hideInstallSheet(true));
+nodes.installButton.addEventListener('click', showInstallSheet);
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  installPrompt = event;
+  renderInstallButton();
+  setTimeout(maybeOfferInstall, 2000);
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  hideInstallSheet(false);
+  renderInstallButton();
+  trackEvent('install_app');
+});
+
 function isIosBrowserTab() {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
@@ -909,7 +993,10 @@ function goBack() {
 window.addEventListener('popstate', () => showScreen(screenFromHash()));
 
 nodes.menuButton.addEventListener('click', () => navigate('menu'));
-nodes.addDone.addEventListener('click', () => navigate('home'));
+nodes.addDone.addEventListener('click', () => {
+  navigate('home');
+  setTimeout(maybeOfferInstall, 800);
+});
 document.getElementById('menu-share').addEventListener('click', event =>
   shareText(t('share.appText'), event.currentTarget.querySelector('.menu-label')),
 );
@@ -995,6 +1082,7 @@ async function init() {
     renderAll();
     syncSubscription();
   }
+  setTimeout(maybeOfferInstall, 3000);
   setInterval(loadDataQuietly, 5 * 60 * 1000);
 }
 

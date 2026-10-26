@@ -355,3 +355,16 @@ html[data-text='xlarge'] { font-size: 136%; }
 .all-times .link-btn { margin-left: 8px; font-size: 0.88rem; padding: 0; }
 #locate-results .place { background: var(--surface); }
 #screen-settings .panel { margin-top: 20px; }
+
+.sheet {
+  position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 536px; margin: 0 auto;
+  background: var(--surface-raised); border-radius: 22px; padding: 20px; z-index: 20;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  animation: sheet-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sheet[hidden] { display: none; }
+.sheet h2 { margin: 0 0 6px; font-size: 1.15rem; }
+.sheet p { margin: 0 0 14px; }
+.sheet .row { display: flex; gap: 10px; flex-wrap: wrap; }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
