@@ -623,36 +623,32 @@ function closuresOnDay(closures, offset, now) {
   return closures.filter(closure => dayKeyOf(closure.start) === key || (offset === 0 && closure.start <= now && closure.end > now)).sort((first, second) => first.start - second.start);
 }
 
-// The plan screen: for every day, the hours without water in each zone as text and as a bar over the 24 hours.
+function windowsCell(closures, now, extraClass = '') {
+  const mine = closures.some(closureMatches);
+  const live = closures.some(closure => closure.start <= now && closure.end > now);
+  return el(
+    'span',
+    { className: `wg-cell${extraClass}${mine ? ' mine' : ''}${live ? ' live' : ''}${closures.length === 0 ? ' empty' : ''}` },
+    closures.length === 0 ? [el('span', { text: '–' })] : closures.map(closure => el('span', { text: compactWindow(closure) })),
+  );
+}
+
+// One row per day, one column per zone: a quick look at when it is a good day to do the laundry.
 function renderWeekGrid() {
   const now = Date.now();
   nodes.planNone.hidden = state.plan.closures.length > 0;
   nodes.planNone.textContent = t('plan.none');
-  const days = [];
+  const cells = [
+    el('span'),
+    ...ZONE_NAMES.map(zone => el('button', { text: t('zone', { zone }), className: 'wg-head', attrs: { type: 'button' }, onClick: () => openZoneSheet(zone) })),
+  ];
   for (let offset = 0; offset < 7; offset += 1) {
-    const day = now + offset * DAY_MS;
-    const key = dayKeyOf(day);
-    const zoneRows = ZONE_NAMES.map(zone => {
-      const closures = state.plan.closures.filter(closure => closure.zone === zone);
-      return { zone, items: closuresOnDay(closures, offset, now), segments: daySegments(closures, key, now) };
-    }).filter(row => row.items.length > 0);
-    const rows =
-      zoneRows.length === 0
-        ? [el('span', { text: '–', className: 'plan-row empty' })]
-        : zoneRows.map(({ zone, items, segments }) => {
-            const dot = el('i');
-            dot.style.background = ZONE_COLORS[zone];
-            return el('div', { className: `plan-row${items.some(closureMatches) ? ' mine' : ''}` }, [
-              el('button', { className: 'plan-zone', attrs: { type: 'button' }, onClick: () => openZoneSheet(zone) }, [dot, el('span', { text: t('zone', { zone }) })]),
-              el('div', { className: 'plan-body' }, [
-                el('div', { className: 'wg-times' }, items.map(closure => el('span', { text: compactWindow(closure) }))),
-                dayBar(segments, ZONE_COLORS[zone]),
-              ]),
-            ]);
-          });
-    days.push(el('div', { className: 'plan-day' }, [dayCellLabel(offset, day), el('div', { className: 'plan-rows' }, rows)]));
+    cells.push(dayCellLabel(offset, now + offset * DAY_MS));
+    for (const zone of ZONE_NAMES) {
+      cells.push(windowsCell(closuresOnDay(state.plan.closures.filter(closure => closure.zone === zone), offset, now), now));
+    }
   }
-  nodes.weekGrid.replaceChildren(...days);
+  nodes.weekGrid.replaceChildren(...cells);
 }
 
 function minutesOfDay(epochMs) {
@@ -675,11 +671,10 @@ function daySegments(closures, key, now) {
   return segments;
 }
 
-function dayBar(segments, color) {
+function dayBar(segments) {
   const bar = el('div', { className: 'wg-bar', attrs: { 'aria-hidden': 'true' } });
   for (const segment of segments) {
     const mark = el('span', { className: `wg-seg${segment.live ? ' live' : ''}` });
-    if (color && !segment.live) mark.style.background = color;
     mark.style.left = `${(segment.from / 1440) * 100}%`;
     mark.style.width = `${((segment.to - segment.from) / 1440) * 100}%`;
     bar.append(mark);
