@@ -63,6 +63,7 @@ const nodes = {
   textSizeSwitch: document.getElementById('text-size-switch'),
   locateButton: document.getElementById('locate-button'),
   locateMessage: document.getElementById('locate-message'),
+  locateHint: document.getElementById('locate-hint'),
   locateResults: document.getElementById('locate-results'),
   zoneMapBox: document.getElementById('zone-map'),
   mapLegend: document.getElementById('map-legend'),
@@ -739,6 +740,7 @@ function locationErrorKey(error) {
 
 async function locateMe() {
   nodes.locateButton.disabled = true;
+  nodes.locateHint.hidden = true;
   nodes.locateResults.replaceChildren();
   nodes.locateMessage.textContent = t('locate.working');
   try {
@@ -748,6 +750,7 @@ async function locateMe() {
     nodes.locateMessage.textContent = t(locationErrorKey(error));
   } finally {
     nodes.locateButton.disabled = false;
+    nodes.locateHint.hidden = false;
   }
 }
 

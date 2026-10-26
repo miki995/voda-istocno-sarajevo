@@ -126,16 +126,18 @@
     </header>
     <div class="panel">
       <p class="muted" data-i18n="watch.help">Dobijaš poruku čim se plan objavi, ujutru na dan zatvaranja i oko 2 sata prije nego što voda nestane.</p>
+      <button id="locate-button" class="btn wide" type="button" data-i18n="locate.button">Pronađi moju ulicu</button>
+      <p class="muted foot-note" data-i18n="locate.privacy">Lokacija se poredi na tvom telefonu i nikome se ne šalje.</p>
+      <p id="locate-message" class="muted" aria-live="polite"></p>
+      <div id="locate-results" class="place-list"></div>
+      <p id="locate-hint" class="hint" data-i18n="locate.notMine" hidden>Nije tvoja ulica? Ukucaj je ispod ili izaberi na mapi.</p>
       <div class="search">
         <label class="sr-only" for="search-input" data-i18n="watch.searchLabel">Pretraži ulicu ili naselje</label>
         <input id="search-input" type="search" inputmode="search" autocomplete="off" autocapitalize="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" placeholder="Ukucaj ulicu ili naselje…" data-i18n-placeholder="watch.placeholder">
         <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
       </div>
+      <button class="btn wide" type="button" data-nav="map" data-i18n="add.map">Izaberi na mapi</button>
       <div class="zone-picker" id="zone-picker" role="group" data-i18n-label="watch.zoneGroup" aria-label="Izaberi cijelu zonu"></div>
-      <button id="locate-button" class="btn wide" type="button" data-i18n="locate.button">Pronađi moju ulicu</button>
-      <p class="muted foot-note" data-i18n="locate.privacy">Lokacija se poredi na tvom telefonu i nikome se ne šalje.</p>
-      <p id="locate-message" class="muted" aria-live="polite"></p>
-      <div id="locate-results" class="place-list"></div>
       <ul id="watch-list" class="watch-items" aria-live="polite"></ul>
       <p id="watch-empty" class="muted center" data-i18n="watch.empty">Još ništa nije izabrano.</p>
       <button id="add-done" class="btn primary wide" type="button" data-i18n="add.done">Gotovo</button>
