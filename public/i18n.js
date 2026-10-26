@@ -437,8 +437,6 @@ export function formatRelativeDay(epochMs, nowMs = Date.now()) {
 
 export function applyStaticTexts() {
   document.documentElement.lang = HTML_LANG[currentLanguage];
-  document.title = t('meta.title');
-  document.querySelector('meta[name="description"]')?.setAttribute('content', t('meta.description'));
   for (const node of document.querySelectorAll('[data-i18n]')) {
     node.textContent = t(node.dataset.i18n);
   }
