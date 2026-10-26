@@ -43,7 +43,9 @@
  },
  {
   "place": "Dečanske",
-  "zone": "I"
+  "zone": "I",
+  "lat": 43.81784,
+  "lon": 18.3651
  },
  {
   "place": "Dobrinja I",
@@ -141,7 +143,9 @@
  },
  {
   "place": "Ozrenske",
-  "zone": "III"
+  "zone": "III",
+  "lat": 43.83941,
+  "lon": 18.37959
  },
  {
   "place": "Radulovac",
@@ -167,7 +171,9 @@
  },
  {
   "place": "Spasovdanske",
-  "zone": "I"
+  "zone": "I",
+  "lat": 43.81939,
+  "lon": 18.36306
  },
  {
   "place": "Srpskih ratnika",
