@@ -1,7 +1,11 @@
 import { sendTestMail } from '../src/health.js';
 import { isAuthorized, sendJson } from '../src/http.js';
+import { rateLimited } from '../src/ratelimit.js';
 
 export default async function handler(req, res) {
+  if (await rateLimited(req, 'test-alert', 10)) {
+    return sendJson(res, 429, { error: 'Too many requests' });
+  }
   if (req.method !== 'POST') {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }

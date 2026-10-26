@@ -1,8 +1,12 @@
 import { runCron } from '../src/core.js';
 import { getStore } from '../src/store.js';
 import { isAuthorized, sendJson } from '../src/http.js';
+import { rateLimited } from '../src/ratelimit.js';
 
 export default async function handler(req, res) {
+  if (await rateLimited(req, 'cron', 20)) {
+    return sendJson(res, 429, { error: 'Too many requests' });
+  }
   if (!isAuthorized(req)) {
     return sendJson(res, 401, { error: 'Unauthorized' });
   }

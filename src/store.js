@@ -31,6 +31,17 @@ function memoryStore() {
       values.set(key, next);
       return next;
     },
+    async decr(key) {
+      const next = (values.get(key) ?? 0) - 1;
+      values.set(key, next);
+      return next;
+    },
+    async mget(keys) {
+      return keys.map(key => (values.has(key) ? structuredClone(values.get(key)) : null));
+    },
+    async expire(key, seconds) {
+      setTimeout(() => values.delete(key), seconds * 1000).unref?.();
+    },
   };
 }
 
@@ -60,6 +71,15 @@ function redisStore(redis) {
     },
     async incr(key) {
       return redis.incr(key);
+    },
+    async decr(key) {
+      return redis.decr(key);
+    },
+    async mget(keys) {
+      return keys.length === 0 ? [] : (await redis.mget(...keys)).map(value => value ?? null);
+    },
+    async expire(key, seconds) {
+      await redis.expire(key, seconds);
     },
   };
 }

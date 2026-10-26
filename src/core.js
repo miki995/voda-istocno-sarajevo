@@ -4,7 +4,7 @@ import { extrasToNotices, parseNotice } from './notices.js';
 import { mergePlacesByZone, parsePlan } from './parser.js';
 import { dayKey } from './time.js';
 import { normalizeLanguage } from './messages.js';
-import { eveningNotifications, noticeNotifications, planNotifications, pruneSent } from './notify.js';
+import { eveningNotifications, limitNotifications, noticeNotifications, planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
 import { checkHealth } from './health.js';
 import { recordHistory } from './history.js';
@@ -182,8 +182,7 @@ async function sendPush(env, subscription, message) {
   return fetch(subscription.endpoint, payload);
 }
 
-async function notifySubscriber(store, env, plan, now, id) {
-  const record = await store.get(subKey(id));
+async function notifySubscriber(store, env, plan, now, id, record) {
   if (!record) {
     await store.srem(SUBS_SET, id);
     return 0;
@@ -197,11 +196,14 @@ async function notifySubscriber(store, env, plan, now, id) {
     lang: record.lang,
     skipIds: planned.map(notification => notification.closureId),
   });
-  const notifications = [
-    ...planned,
-    ...evening,
-    ...noticeNotifications({ notices: plan.notices, watches: record.watches, sent: record.sent, now, lang: record.lang }),
-  ];
+  const notifications = limitNotifications(
+    [
+      ...planned,
+      ...evening,
+      ...noticeNotifications({ notices: plan.notices, watches: record.watches, sent: record.sent, now, lang: record.lang }),
+    ],
+    record.lang,
+  );
   let delivered = 0;
   for (const notification of notifications) {
     const response = await sendPush(env, record.subscription, {
@@ -231,10 +233,43 @@ async function notifySubscriber(store, env, plan, now, id) {
   return delivered;
 }
 
+const GROUP_SIZE = 25;
+const READ_SIZE = 200;
+const TIME_BUDGET_MS = 22000;
+
+function shuffled(items) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[other]] = [copy[other], copy[index]];
+  }
+  return copy;
+}
+
+// All records are read with one command per 200 subscribers and sent in groups of 25. If the time runs out the rest
+// waits for the next run; the order is shuffled so the same people are not always last.
 export async function dispatchNotifications(store, env, plan, now) {
-  const ids = await store.smembers(SUBS_SET);
-  const results = await Promise.all(ids.map(id => notifySubscriber(store, env, plan, now, id)));
-  return results.reduce((total, count) => total + count, 0);
+  const ids = shuffled(await store.smembers(SUBS_SET));
+  const started = Date.now();
+  let delivered = 0;
+  let skipped = 0;
+  for (let offset = 0; offset < ids.length; offset += READ_SIZE) {
+    const batch = ids.slice(offset, offset + READ_SIZE);
+    if (Date.now() - started > TIME_BUDGET_MS) {
+      skipped += batch.length;
+      continue;
+    }
+    const records = await store.mget(batch.map(subKey));
+    for (let start = 0; start < batch.length; start += GROUP_SIZE) {
+      if (Date.now() - started > TIME_BUDGET_MS) {
+        skipped += batch.length - start;
+        break;
+      }
+      const counts = await Promise.all(batch.slice(start, start + GROUP_SIZE).map((id, index) => notifySubscriber(store, env, plan, now, id, records[start + index])));
+      delivered += counts.reduce((total, count) => total + count, 0);
+    }
+  }
+  return { delivered, skipped };
 }
 
 export async function runCron(store, env, now = Date.now()) {
@@ -248,10 +283,10 @@ export async function runCron(store, env, now = Date.now()) {
     problem = { kind: 'fetch-failed', detail: `vikis.info se ne može učitati: ${error.message}` };
     plan = await loadPlan(store);
   }
-  const delivered = await dispatchNotifications(store, env, plan, now);
+  const { delivered, skipped } = await dispatchNotifications(store, env, plan, now);
   const health = await checkHealth(store, env, problem, now).catch(error => `health check failed: ${error.message}`);
   await recordCron(store, { at: now, closures: plan.closures.length, notices: plan.notices.length, delivered, problem: problem?.kind ?? null }).catch(() => undefined);
-  return { closures: plan.closures.length, notices: plan.notices.length, delivered, planError, health };
+  return { closures: plan.closures.length, notices: plan.notices.length, delivered, skipped, planError, health };
 }
 
 export async function saveSubscription(store, subscription, rawWatches, lang) {

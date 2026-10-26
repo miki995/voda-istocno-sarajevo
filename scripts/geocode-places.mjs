@@ -7,10 +7,21 @@ import { fold } from '../src/text.js';
 const OUTPUT = new URL('../public/places.json', import.meta.url);
 const SEED = new URL('../src/zones-seed.json', import.meta.url);
 const VIEWBOX = '18.31,43.87,18.45,43.75';
-const USER_AGENT = 'voda-istocno-sarajevo/1.0 (miroslavmaksimovic95@gmail.com)';
+// Nominatim asks for a way to reach whoever runs the script; the site is that way.
+const USER_AGENT = 'voda-istocno-sarajevo/1.0 (+https://vodais.vercel.app)';
 
 // The plan writes some streets in a different grammatical form than OpenStreetMap does.
-const SEARCH_NAMES = { Ozrenske: 'Ozrenska', Dečanske: 'Dečanska', Spasovdanske: 'Spasovdanska' };
+const SEARCH_NAMES = { Ozrenske: 'Ozrenska', Dečanske: 'Dečanska', Spasovdanske: 'Spasovdanska', Hilandarske: 'Hilandarska' };
+
+// Places the plan names differently than the map does. "like" takes the position of another place, "search" takes the
+// middle of the named streets or buildings.
+const ALIASES = {
+  'Famosovo naselje': { like: 'Trg Miroslava Berjana' },
+  'TC TOM': { like: 'Zmaj Jovina' },
+  'Novakovići': { like: 'Donji Kotorac' },
+  'Miroslava Krleže': { search: ['Autobuska stanica'] },
+  Radulovac: { search: ['Aerodromska', 'Rajlovačka'] },
+};
 
 const zones = JSON.parse(readFileSync(SEED, 'utf8'));
 if (process.argv[2]) {
@@ -32,12 +43,28 @@ async function lookup(place) {
   return hit ? { lat: Number(Number(hit.lat).toFixed(5)), lon: Number(Number(hit.lon).toFixed(5)) } : null;
 }
 
+async function resolveAlias(alias) {
+  if (alias.like) {
+    const known = byKey.get(fold(alias.like));
+    return known?.lat ? { lat: known.lat, lon: known.lon } : null;
+  }
+  const found = [];
+  for (const name of alias.search) {
+    const hit = await lookup(name);
+    await sleep(1100);
+    if (hit) found.push(hit);
+  }
+  if (found.length === 0) return null;
+  const middle = key => Number((found.reduce((total, hit) => total + hit[key], 0) / found.length).toFixed(5));
+  return { lat: middle('lat'), lon: middle('lon') };
+}
+
 let missing = 0;
 for (const [zone, places] of Object.entries(zones)) {
   for (const place of places) {
     const key = fold(place);
     if (byKey.get(key)?.lat) continue;
-    const coords = await lookup(place);
+    const coords = ALIASES[place] ? await resolveAlias(ALIASES[place]) : await lookup(place);
     await sleep(1100);
     if (!coords) {
       missing += 1;

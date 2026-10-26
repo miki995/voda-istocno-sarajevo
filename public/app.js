@@ -1,6 +1,7 @@
 import { initAnalytics, trackEvent } from './analytics.js';
 import { LANGUAGES, LANGUAGE_LABELS, applyStaticTexts, dayKeyOf, formatDayLabel, formatDuration, formatRelativeDay, getLanguage, local, setLanguage, t } from './i18n.js';
 import { buildIcs, downloadIcs } from './calendar.js';
+import { checkContactMessage } from './contact-rules.js';
 import { createZoneMap, getPosition, nearestPlaces, ZONE_COLORS } from './map.js';
 import { downloadBlob, renderWeekImage } from './share-image.js';
 import { toLatin } from './translit.js';
@@ -8,7 +9,7 @@ import { toLatin } from './translit.js';
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
-const SCREENS = ['home', 'menu', 'add', 'notices', 'plan', 'map', 'settings'];
+const SCREENS = ['home', 'menu', 'add', 'notices', 'plan', 'map', 'settings', 'contact'];
 const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
 const TEXT_KEY = 'voda-text';
 const CRON_SILENT_MS = 60 * 60 * 1000;
@@ -76,6 +77,7 @@ const nodes = {
   installGo: document.getElementById('install-go'),
   installLater: document.getElementById('install-later'),
   installButton: document.getElementById('install-button'),
+  toast: document.getElementById('toast'),
   locateResults: document.getElementById('locate-results'),
   zoneMapBox: document.getElementById('zone-map'),
   mapLegend: document.getElementById('map-legend'),
@@ -187,6 +189,29 @@ function nameParts(watch, zone) {
     el('span', { text: watchLabel(watch) }),
     ...(zone && watch.kind !== 'ZONE' ? [el('span', { text: ` · ${t('zone', { zone })}`, className: 'muted' })] : []),
   ];
+}
+
+let toastTimer;
+
+function hideToast() {
+  nodes.toast.hidden = true;
+}
+
+function showToast(text, actionText, onAction) {
+  nodes.toast.replaceChildren(
+    el('span', { text }),
+    el('button', { text: actionText, className: 'link-btn', attrs: { type: 'button' }, onClick: () => { hideToast(); onAction(); } }),
+  );
+  nodes.toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 6000);
+}
+
+// Removing is one tap, and "Undo" is there for a few seconds in case it was an accident.
+function removeWatch(watch) {
+  const { kind, value } = watch;
+  toggleWatch(kind, value);
+  showToast(t('watch.removed', { name: watchLabel(watch) }), t('watch.undo'), () => toggleWatch(kind, value));
 }
 
 function watchKey(watch) {
@@ -358,6 +383,7 @@ function homeCard(watch) {
   card.append(
     el('div', { className: 'card-actions' }, [
       ...(nextClosure ? [linkButton(t('card.calendar'), () => addToCalendar(nextClosure, watchLabel(watch)))] : []),
+      linkButton(t('card.remove'), () => removeWatch(watch)),
       linkButton(t('card.share'), event =>
         shareText(t('share.cardText', { name: watchLabel(watch), title: status.title, detail: status.detail }), event.currentTarget),
       ),
@@ -443,8 +469,47 @@ function noticeCards() {
   return cards;
 }
 
+// Until the first plan arrives nothing is known, so the cards must not say "no outages". They show a shimmer while loading
+// and an honest message with a retry if it did not work.
+function skeletonCard() {
+  return el('article', { className: 'home-card skeleton', attrs: { 'aria-hidden': 'true' } }, [
+    el('p', { className: 'sk sk-line short' }),
+    el('p', { className: 'sk sk-title' }),
+    el('p', { className: 'sk sk-line' }),
+  ]);
+}
+
+function loadErrorCard() {
+  return el('article', { className: 'home-card tone-warn' }, [
+    el('p', { text: t('plan.loadFailed'), className: 'home-card-title' }),
+    el('button', {
+      text: t('plan.retry'),
+      className: 'btn primary',
+      attrs: { type: 'button' },
+      onClick: () => {
+        state.planLoadFailed = false;
+        renderAll();
+        loadDataQuietly();
+      },
+    }),
+  ]);
+}
+
+function planUnknown() {
+  return state.plan.fetchedAt === 0;
+}
+
 function renderHome() {
   renderBanner();
+  nodes.homeContent.setAttribute('aria-busy', String(planUnknown() && !state.planLoadFailed));
+  if (state.watches.length > 0 && planUnknown()) {
+    nodes.homeContent.replaceChildren(
+      ...(state.planLoadFailed
+        ? [loadErrorCard()]
+        : state.watches.slice(0, 3).map(skeletonCard)),
+    );
+    return;
+  }
   if (state.watches.length === 0) {
     nodes.homeContent.replaceChildren(
       ...sourceNotice(),
@@ -526,7 +591,7 @@ function renderWatchList() {
             text: '×',
             className: 'watch-remove',
             attrs: { type: 'button', 'aria-label': t('watch.remove', { name: watchLabel(watch) }) },
-            onClick: () => toggleWatch(watch.kind, watch.value),
+            onClick: () => removeWatch(watch),
           }),
         ]),
       ]),
@@ -631,6 +696,46 @@ async function shareWeekImage() {
 
 nodes.shareWeek.addEventListener('click', shareWeekImage);
 
+async function submitContact(event) {
+  event.preventDefault();
+  const field = id => document.getElementById(id);
+  const status = field('contact-status');
+  const send = field('contact-send');
+  const data = {
+    name: field('contact-name').value,
+    email: field('contact-email').value,
+    company: field('contact-company').value,
+    message: field('contact-message').value,
+    confirmed: field('contact-confirm').checked,
+    website: field('contact-website').value,
+  };
+  const problem = checkContactMessage(data);
+  if (problem) {
+    status.textContent = t(`contact.err.${problem}`);
+    return;
+  }
+  send.disabled = true;
+  status.textContent = t('contact.sending');
+  try {
+    const response = await fetch('/api/contact', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok && body.ok) {
+      status.textContent = t('contact.sent');
+      field('contact-form').reset();
+      trackEvent('contact_sent');
+    } else {
+      status.textContent = t(`contact.err.${body.reason && body.reason !== 'invalid' ? body.reason : 'failed'}`);
+    }
+  } catch {
+    status.textContent = t('contact.err.failed');
+  } finally {
+    send.disabled = false;
+  }
+}
+
+document.getElementById('contact-form').addEventListener('submit', submitContact);
+
+
 function compactWindow(closure) {
   return `${timeFormat.format(closure.start)}–${endTimeText(closure)}`;
 }
@@ -661,7 +766,8 @@ function windowsCell(closures, now, zone) {
 // One row per day, one column per zone: a quick look at when it is a good day to do the laundry.
 function renderWeekGrid() {
   const now = Date.now();
-  nodes.planNone.hidden = state.plan.closures.length > 0;
+  nodes.weekGrid.classList.toggle('loading', planUnknown() && !state.planLoadFailed);
+  nodes.planNone.hidden = state.plan.closures.length > 0 || planUnknown();
   nodes.planNone.textContent = t('plan.none');
   const cells = [
     el('span'),

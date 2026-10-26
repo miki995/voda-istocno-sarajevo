@@ -25,11 +25,18 @@ The site is available in Serbian (default in Cyrillic, with a Latin option in th
 - **Larger text:** three sizes in the menu, remembered on the device.
 - **Offline:** the service worker keeps the app and the last plan, so it opens without a connection.
 - **Status page:** `/admin.html` asks for `CRON_SECRET` and shows subscribers, last cron run, source problems and push delivery (ok / failed / removed devices).
-- **Source alerts by e-mail:** set `RESEND_API_KEY` (and optionally `ALERT_EMAIL`, `ALERT_FROM`). A mail is sent when vikis.info cannot be read or understood for 30 minutes, at most once a day.
+- **Source alerts by e-mail:** set `RESEND_API_KEY` and `ALERT_EMAIL` (the address that receives alerts and contact-form messages; it is never written in the code), and optionally `ALERT_FROM`. A mail is sent when vikis.info cannot be read or understood for 30 minutes, at most once a day.
 
 - **Where visitors come from:** share links as `https://your-site/?utm_source=instagram` (counted names: instagram, facebook, viber, whatsapp, tiktok, telegram, youtube, google, sms, email, qr; anything else is counted as `other`); the status page lists visits per source. Instagram, Facebook and Viber open links in their own browser where alerts and installing do not work, so the home page asks those visitors to open the site in a real browser.
 - **Self-healing refresh:** GitHub delays or drops scheduled runs, so `/api/plan` refreshes the data itself when the last check is more than 10 minutes old (only the first visitor in each 5 minutes does it). For a steady schedule also add a free cron-job.org job: GET `$SITE_URL/api/cron` every 5 minutes with the header `Authorization: Bearer <CRON_SECRET>`. The `SITE_URL` repository secret must be the live domain (a redirecting domain makes the poll succeed without doing anything; the workflow now fails unless it gets a 200).
 - **Stale data notice:** shown only when the check itself fails (site cannot be read, layout changed, or no check for an hour), never just because there is no news.
+
+- **Light on Redis:** the checker reads all subscribers with one `MGET` per 200 and sends in groups of 25 within a 22-second budget (the rest waits for the next run, in shuffled order). If many things are due at once for one person, the top two are sent and the rest become one digest message.
+- **Rate limits:** `/api/hit`, `subscribe`, `unsubscribe`, `cron`, `stats` and `test-alert` allow a limited number of calls per minute per caller. The counters expire after two minutes (the caller address is only held that long).
+- **Link preview:** `og:` tags and `public/og-image.png` give shared links a picture and description.
+
+- **Collaboration form:** Settings → "Collaboration and business enquiries" posts to `/api/contact`, which mails the message to `ALERT_EMAIL` (reply-to is the sender, the sender never sees the address). Only collaboration or business messages go through (`public/contact-rules.js`: needs a collaboration word, rejects questions about water or breakdowns, at most two links); 3 messages per hour per caller and 15 per day overall, and a hidden field catches robots.
+- **Removing a street:** "Remove" on the card or the x in the list, with an "Undo" for six seconds.
 
 ## Usage statistics
 

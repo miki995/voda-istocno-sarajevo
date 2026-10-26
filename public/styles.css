@@ -416,3 +416,27 @@ button.wg-head { border-radius: 0; text-decoration: none; padding: 6px 2px 5px; 
   .week-grid:not(.single) { font-size: 0.66rem; }
   .week-grid:not(.single) .wg-day { font-size: 0.68rem; }
 }
+
+
+.form { display: grid; gap: 8px; margin-top: 14px; }
+.form label { font-size: 0.9rem; font-weight: 600; margin-top: 6px; }
+.form input[type='text'], .form input[type='email'], .form textarea { width: 100%; font: inherit; font-size: 1rem; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--surface); color: var(--text); }
+.form textarea { resize: vertical; min-height: 130px; }
+.form input:focus-visible, .form textarea:focus-visible { outline: none; box-shadow: var(--focus); }
+.form .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; margin-top: 12px; }
+.form .check input { margin-top: 4px; width: 20px; height: 20px; flex-shrink: 0; }
+.form .btn { margin-top: 12px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 14px; max-width: calc(100% - 32px); background: #1d1d1f; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 0.94rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3); }
+.toast[hidden] { display: none; }
+.toast .link-btn { color: #6cb4ff; font-weight: 600; padding: 2px 0; }
+
+.skeleton { pointer-events: none; }
+.sk { border-radius: 8px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 25%, rgba(0, 0, 0, 0.12) 37%, rgba(0, 0, 0, 0.06) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; }
+.sk-line { height: 14px; width: 70%; margin: 0 0 12px; }
+.sk-line.short { width: 28%; }
+.sk-title { height: 30px; width: 62%; margin: 0 0 14px; }
+.week-grid.loading .wg-cell { background: linear-gradient(90deg, rgba(0, 0, 0, 0.05) 25%, rgba(0, 0, 0, 0.1) 37%, rgba(0, 0, 0, 0.05) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; color: transparent; box-shadow: none; }
+.week-grid.loading .wg-cell::after { display: none; }
+@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .sk, .week-grid.loading .wg-cell { animation: none; } }

@@ -1,21 +1,25 @@
 const HEALTH_KEY = 'health';
 const PERSIST_MS = 30 * 60 * 1000;
 const REPEAT_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_RECIPIENT = 'miroslavmaksimovic95@gmail.com';
 
-async function deliver(env, subject, text) {
+async function deliver(env, subject, text, extra = {}) {
   if (!env.RESEND_API_KEY) {
     console.error('RESEND_API_KEY is not set, cannot send:', subject);
     return { ok: false, status: 0, detail: 'RESEND_API_KEY nije podešen na serveru' };
+  }
+  if (!env.ALERT_EMAIL) {
+    console.error('ALERT_EMAIL is not set, cannot send:', subject);
+    return { ok: false, status: 0, detail: 'ALERT_EMAIL nije podešen na serveru' };
   }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       from: env.ALERT_FROM ?? 'Voda ISA <onboarding@resend.dev>',
-      to: [env.ALERT_EMAIL ?? DEFAULT_RECIPIENT],
+      to: [env.ALERT_EMAIL],
       subject,
       text,
+      ...extra,
     }),
   });
   if (!response.ok) {
@@ -26,6 +30,13 @@ async function deliver(env, subject, text) {
 
 async function sendMail(env, subject, text) {
   return (await deliver(env, subject, text)).ok;
+}
+
+// A message from the collaboration form. The reply goes to the sender, the sender never sees where it was delivered.
+export async function sendContactMail(env, { name, email, company, message }) {
+  const oneLine = value => String(value).replace(/[\r\n]+/g, ' ').slice(0, 80);
+  const text = [`Ime: ${oneLine(name)}`, `Mejl: ${oneLine(email)}`, company ? `Firma/projekat: ${oneLine(company)}` : null, '', message].filter(line => line !== null).join('\n');
+  return deliver(env, `[Voda ISA] Saradnja: ${oneLine(name)}`, text, { reply_to: oneLine(email) });
 }
 
 export async function sendTestMail(env, now = Date.now()) {

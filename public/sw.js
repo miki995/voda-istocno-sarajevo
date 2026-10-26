@@ -1,5 +1,5 @@
-const CACHE = 'voda-v2';
-const SHELL = ['/', '/app.js', '/i18n.js', '/translit.js', '/calendar.js', '/analytics.js', '/map.js', '/places.json', '/styles.css', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
+const CACHE = 'voda-v4';
+const SHELL = ['/', '/app.js', '/i18n.js', '/translit.js', '/calendar.js', '/share-image.js', '/contact-rules.js', '/analytics.js', '/map.js', '/places.json', '/styles.css', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
 const CACHED_API = ['/api/plan', '/api/zones', '/api/history'];
 
 self.addEventListener('install', event => {

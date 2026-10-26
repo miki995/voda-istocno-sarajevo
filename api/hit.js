@@ -1,8 +1,12 @@
 import { getStore } from '../src/store.js';
 import { readBody, sendJson } from '../src/http.js';
+import { rateLimited } from '../src/ratelimit.js';
 import { recordHit, sanitizeHit } from '../src/stats.js';
 
 export default async function handler(req, res) {
+  if (await rateLimited(req, 'hit', 30)) {
+    return sendJson(res, 429, { error: 'Too many requests' });
+  }
   if (req.method !== 'POST') {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }

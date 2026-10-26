@@ -11,6 +11,8 @@ export const EVENING_HOUR = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const KIND_PRIORITY = ['SOON', 'MORNING', 'PUBLISHED'];
+const SEND_ORDER = ['SOON', 'MORNING', 'EVENING', 'RESTORED', 'NOTICE', 'PUBLISHED'];
+export const MAX_PER_RUN = 3;
 
 export function matchedWatches(closure, watches, lang = DEFAULT_LANGUAGE) {
   const labels = [];
@@ -82,6 +84,7 @@ function restoredNotification(closure, closures, watches, sent, now, lang) {
   const window = `${formatTime(closure.start)}–${formatEndTime(closure.start, closure.end)}`;
   return {
     closureId: closure.id,
+    kind: 'RESTORED',
     tag: `${closure.id}-RESTORED`,
     markSent: [`${closure.id}|RESTORED`],
     ...localized({ title: messagesFor(lang).restored, body: `${window} (${messagesFor(lang).zone(closure.zone)}) – ${labels.join(', ')}` }, lang),
@@ -111,7 +114,7 @@ export function eveningNotifications({ closures, watches, sent, now, lang = DEFA
   if (lines.length === 0) {
     return [];
   }
-  return [{ tag: `evening-${dayKey(now)}`, markSent, ...localized({ title: messagesFor(lang).tomorrow, body: lines.join('\n') }, lang) }];
+  return [{ kind: 'EVENING', tag: `evening-${dayKey(now)}`, markSent, ...localized({ title: messagesFor(lang).tomorrow, body: lines.join('\n') }, lang) }];
 }
 
 export function planNotifications({ closures, watches, sent, now, lang = DEFAULT_LANGUAGE }) {
@@ -136,6 +139,7 @@ export function planNotifications({ closures, watches, sent, now, lang = DEFAULT
     }
     notifications.push({
       closureId: closure.id,
+      kind,
       tag: `${closure.id}-${kind}`,
       markSent,
       ...localized(buildMessage(kind, closure, labels, now, lang), lang),
@@ -158,6 +162,7 @@ export function noticeNotifications({ notices, watches, sent, now, lang = DEFAUL
       }
       const summary = notice.text.length > NOTICE_SUMMARY_LENGTH ? `${notice.text.slice(0, NOTICE_SUMMARY_LENGTH).trim()}…` : notice.text;
       return [{
+        kind: 'NOTICE',
         tag: notice.id,
         markSent: [`${notice.id}|NOTICE`],
         ...localized({ title: (messages.notice[notice.kind] ?? messages.notice.breakdown)(labels.join(', ')), body: summary }, lang),
@@ -168,4 +173,17 @@ export function noticeNotifications({ notices, watches, sent, now, lang = DEFAUL
 export function pruneSent(sent, items) {
   const knownIds = new Set(items.map(item => item.id));
   return sent.filter(entry => knownIds.has(entry.split('|')[0]));
+}
+
+// After a long outage of the checker many things are due at once. The most urgent are sent as they are and the rest
+// become one message, so nobody gets a burst of notifications.
+export function limitNotifications(notifications, lang = DEFAULT_LANGUAGE, max = MAX_PER_RUN) {
+  if (notifications.length <= max) {
+    return notifications;
+  }
+  const sorted = [...notifications].sort((first, second) => SEND_ORDER.indexOf(first.kind) - SEND_ORDER.indexOf(second.kind));
+  const rest = sorted.slice(max - 1);
+  const messages = messagesFor(lang);
+  const digest = { kind: 'MORE', tag: `more-${rest[0].tag}`, markSent: rest.flatMap(notification => notification.markSent), ...localized({ title: messages.more(rest.length), body: messages.moreBody }, lang) };
+  return [...sorted.slice(0, max - 1), digest];
 }

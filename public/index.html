@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Voda Istočno Sarajevo</title>
   <meta name="description" content="Obavještenja o nestanku vode u Istočnom Sarajevu za tvoju ulicu ili zonu.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Вода · Источно Сарајево">
+  <meta property="og:title" content="Вода Источно Сарајево">
+  <meta property="og:description" content="Обавјештења о нестанку воде у Источном Сарајеву за твоју улицу или зону.">
+  <meta property="og:url" content="https://vodais.vercel.app/">
+  <meta property="og:image" content="https://vodais.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light">
   <meta name="mobile-web-app-capable" content="yes">
@@ -119,6 +128,34 @@
       <p id="alerts-hint" class="hint" hidden></p>
       <button id="install-button" class="btn wide" type="button" data-i18n="install.button" hidden>Instaliraj aplikaciju</button>
     </div>
+    <p class="foot-note"><button class="link-btn" type="button" data-nav="contact" data-i18n="contact.link">Saradnja i poslovni upiti</button></p>
+  </section>
+
+  <section id="screen-contact" class="screen" data-screen="contact" hidden>
+    <header class="nav">
+      <button class="nav-back" type="button" data-nav-back>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        <span data-i18n="nav.back">Nazad</span>
+      </button>
+      <h2 data-i18n="contact.title">Saradnja</h2>
+    </header>
+    <div class="panel">
+      <p class="muted" data-i18n="contact.intro">Ova forma je samo za saradnju i poslovne upite.</p>
+      <form id="contact-form" class="form" novalidate>
+        <label for="contact-name" data-i18n="contact.name">Ime i prezime</label>
+        <input id="contact-name" type="text" autocomplete="name" maxlength="80">
+        <label for="contact-email" data-i18n="contact.email">Tvoj mejl</label>
+        <input id="contact-email" type="email" autocomplete="email" maxlength="120">
+        <label for="contact-company" data-i18n="contact.company">Firma ili projekat (nije obavezno)</label>
+        <input id="contact-company" type="text" autocomplete="organization" maxlength="80">
+        <label for="contact-message" data-i18n="contact.message">Poruka</label>
+        <textarea id="contact-message" rows="6" maxlength="2000"></textarea>
+        <div class="sr-only" aria-hidden="true"><label for="contact-website">Website</label><input id="contact-website" type="text" tabindex="-1" autocomplete="off"></div>
+        <label class="check"><input id="contact-confirm" type="checkbox"> <span data-i18n="contact.confirm">Potvrđujem da je ovo upit za saradnju, a ne pitanje o vodi.</span></label>
+        <button id="contact-send" class="btn primary wide" type="submit" data-i18n="contact.send">Pošalji</button>
+        <p id="contact-status" class="muted" aria-live="polite"></p>
+      </form>
+    </div>
   </section>
 
   <section id="screen-add" class="screen" data-screen="add" hidden>
@@ -198,6 +235,8 @@
     </div>
   </section>
 
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <div id="zone-backdrop" class="backdrop" hidden></div>
   <aside id="zone-sheet" class="sheet tall" role="dialog" aria-labelledby="zone-sheet-title" hidden>
