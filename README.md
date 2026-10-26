@@ -6,7 +6,7 @@ Live at https://vodais.vercel.app. It is a web app (PWA): it can be added to the
 
 ## What people see
 
-**Home screen.** One card per watched street with the state of the water, shown by a small animated drop: happy (no outages planned), with a ticking clock (an outage is coming) or sad (no water now). The card has a live countdown ("in 4 h 51 min", "2 h 10 min left"), buttons to add the outage to the calendar (.ics with a reminder an hour before), share it as text or remove the street (with a few seconds to undo), and an "All times" grid of the next seven days with a 24-hour bar per day. If the street was without water in the last 30 days the card says how often and for how long. While the plan loads there are shimmering placeholders, and if it cannot be loaded there is an honest message with "Try again" instead of a green "all good".
+**Home screen.** One card per watched street with the state of the water, shown by a small animated drop: happy (no outages planned), with a ticking clock (an outage is coming) or sad (no water now). The card has a live countdown ("in 4 h 51 min", "2 h 10 min left"), buttons to add the outage to the calendar (.ics with a reminder an hour before), share it as text or remove the street (with a few seconds to undo), and an "All times" grid of the next seven days with a 24-hour bar per day. While the plan loads there are shimmering placeholders, and if it cannot be loaded there is an honest message with "Try again" instead of a green "all good".
 
 **Menu.** My streets, Utility notices (breakdowns, works, shutdown announcements, shortages; the ones mentioning your streets are marked), Full plan, Share the app, Settings, Sources and Collaboration.
 

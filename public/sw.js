@@ -1,6 +1,6 @@
 const CACHE = 'voda-v5';
 const SHELL = ['/', '/app.js', '/i18n.js', '/translit.js', '/calendar.js', '/share-image.js', '/status-art.js', '/contact-rules.js', '/analytics.js', '/map.js', '/places.json', '/styles.css', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
-const CACHED_API = ['/api/plan', '/api/zones', '/api/history'];
+const CACHED_API = ['/api/plan', '/api/zones'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

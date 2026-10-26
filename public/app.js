@@ -38,7 +38,6 @@ const state = {
   alertsMessage: '',
   planLoadFailed: false,
   openDetails: new Set(),
-  history: [],
   placeCoords: [],
   zoneMap: null,
   textSize: loadTextSize(),
@@ -335,16 +334,6 @@ async function shareText(text, button) {
   setTimeout(() => { button.textContent = label; }, 1800);
 }
 
-function pastSummary(watch) {
-  const now = Date.now();
-  const hits = state.history.filter(closure => closure.end <= now && closure.end >= now - 30 * DAY_MS && watchMatchesClosure(watch, closure));
-  if (hits.length === 0) return '';
-  const totalMs = hits.reduce((total, closure) => total + (closure.end - closure.start), 0);
-  const hours = Math.round(totalMs / (60 * 60 * 1000));
-  const average = hits.length > 1 ? ` · ${t('stats.avg', { avg: Math.round(totalMs / hits.length / (60 * 60 * 1000)) })}` : '';
-  return `${t('stats.last30', { count: hits.length, hours })}${average}`;
-}
-
 // "No news" is not a problem. The notice only appears when the check itself fails: the site cannot be read, or the check has stopped running.
 function sourceTrouble() {
   const { checkedAt, problem } = state.plan;
@@ -378,10 +367,6 @@ function homeCard(watch) {
     el('p', { text: status.title, className: 'home-card-title' }),
     el('p', { text: status.detail, className: 'home-card-detail' }),
   ]);
-  const past = pastSummary(watch);
-  if (past) {
-    card.append(el('p', { text: past, className: 'home-card-detail muted' }));
-  }
   const nextClosure = upcoming.find(closure => closure.start > Date.now());
   card.append(
     el('div', { className: 'card-actions' }, [
@@ -1325,15 +1310,13 @@ document.querySelectorAll('[data-nav]').forEach(button => button.addEventListene
 document.querySelectorAll('[data-nav-back]').forEach(button => button.addEventListener('click', goBack));
 
 async function loadData() {
-  const [plan, zonePlaces, history, placeCoords] = await Promise.all([
+  const [plan, zonePlaces, placeCoords] = await Promise.all([
     fetch('/api/plan').then(response => response.json()),
     fetch('/api/zones').then(response => response.json()),
-    fetch('/api/history').then(response => response.json()).catch(() => state.history),
     fetch('/places.json').then(response => response.json()).catch(() => state.placeCoords),
   ]);
   state.plan = plan;
   state.zonePlaces = zonePlaces;
-  state.history = Array.isArray(history) ? history : [];
   const previousPlaces = state.placeCoords.length;
   state.placeCoords = Array.isArray(placeCoords) ? placeCoords : [];
   if (state.zoneMap && state.placeCoords.length !== previousPlaces) {
