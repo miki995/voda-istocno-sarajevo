@@ -88,6 +88,15 @@ const DICTIONARY = {
     'zones.count': '{count} mjesta',
     'zone': 'Zona {zone}',
     'menu.map': 'Mapa zona',
+    'count.left': 'još {duration}',
+    'count.in': 'za {duration}',
+    'plan.week': 'Sedmica unaprijed',
+    'plan.gridHelp': 'Crveno su termini za tvoje ulice. Dodirni dan ispod za cijeli spisak.',
+    'plan.shareImage': 'Podijeli sliku',
+    'img.title': 'Redukcija vode · Istočno Sarajevo',
+    'img.footer': 'Obavještenja za tvoju ulicu: {host}',
+    'img.more': '+{count} još',
+    'stats.avg': 'prosječno {avg} {h} po prekidu',
     'inapp.text': 'Ovo je ugrađeni preglednik (Instagram, Facebook…). Obavještenja i instalacija ovdje ne rade. Otvori sajt u pregledniku.',
     'inapp.openChrome': 'Otvori u Chrome-u',
     'inapp.copy': 'Kopiraj link',
@@ -119,7 +128,7 @@ const DICTIONARY = {
     'locate.far': 'Nema poznate ulice u blizini. Najbliže je:',
     'distance.m': '{value} m',
     'distance.km': '{value} km',
-    'stats.last30': 'Zadnjih 30 dana: {count}× bez vode · {hours} h',
+    'stats.last30': 'Zadnjih 30 dana: {count}× bez vode · {hours} {h}',
     'source.stale': 'Ne uspijevamo da pročitamo podatke vodovoda od {time}. Provjeri njihovu stranicu ili ih pozovi.',
     'source.facebook': 'Facebook vodovoda',
     'source.call': 'Pozovi 057 342 742',
@@ -215,6 +224,15 @@ const DICTIONARY = {
     'zones.count': '{count} places',
     'zone': 'Zone {zone}',
     'menu.map': 'Zone map',
+    'count.left': '{duration} left',
+    'count.in': 'in {duration}',
+    'plan.week': 'The week ahead',
+    'plan.gridHelp': 'Red marks the times for your streets. Tap a day below for the full list.',
+    'plan.shareImage': 'Share as picture',
+    'img.title': 'Water outage plan · Istočno Sarajevo',
+    'img.footer': 'Alerts for your street: {host}',
+    'img.more': '+{count} more',
+    'stats.avg': 'about {avg} {h} per outage',
     'inapp.text': 'This is an in-app browser (Instagram, Facebook…). Alerts and installing do not work here. Open the site in your browser.',
     'inapp.openChrome': 'Open in Chrome',
     'inapp.copy': 'Copy link',
@@ -246,7 +264,7 @@ const DICTIONARY = {
     'locate.far': 'No known street nearby. The closest is:',
     'distance.m': '{value} m',
     'distance.km': '{value} km',
-    'stats.last30': 'Last 30 days: {count}× without water · {hours} h',
+    'stats.last30': 'Last 30 days: {count}× without water · {hours} {h}',
     'source.stale': 'We have not been able to read the water utility data since {time}. Check their page or call them.',
     'source.facebook': 'Utility on Facebook',
     'source.call': 'Call 057 342 742',
@@ -305,13 +323,32 @@ export function local(text) {
 export function t(key, values = {}) {
   const dictionary = DICTIONARY[currentLanguage === 'en' ? 'en' : 'sr'];
   const template = dictionary[key] ?? DICTIONARY[DEFAULT_LANGUAGE][key] ?? key;
-  return local(template.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? '')));
+  return local(template.replace(/\{(\w+)\}/g, (_, name) => String(name === 'h' ? hourUnit() : (values[name] ?? ''))));
 }
 
 export function formatDayLabel(epochMs) {
   if (currentLanguage === 'en') return englishDayFormat.format(epochMs);
   const parts = Object.fromEntries(dayPartsFormat.formatToParts(new Date(epochMs)).map(part => [part.type, part.value]));
   return local(`${WEEKDAYS_SR[WEEKDAY_INDEX[parts.weekday]]}, ${parts.day}.${parts.month}.`);
+}
+
+// Hours are "h" in Latin and English text and "ч" in Cyrillic; `t` would turn a plain "h" into "х".
+export function hourUnit() {
+  return currentLanguage === 'sr' ? 'ч' : 'h';
+}
+
+export function formatDuration(ms) {
+  const total = Math.max(1, Math.round(ms / 60000));
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${hours} ${hourUnit()}`);
+  if (minutes > 0 || hours === 0) parts.push(`${minutes} min`);
+  return local(parts.join(' '));
+}
+
+export function dayKeyOf(epochMs) {
+  return dayKeyFormat.format(epochMs);
 }
 
 const dayKeyFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });

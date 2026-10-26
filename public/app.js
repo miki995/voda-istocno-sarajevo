@@ -1,7 +1,8 @@
 import { initAnalytics, trackEvent } from './analytics.js';
-import { LANGUAGES, LANGUAGE_LABELS, applyStaticTexts, formatDayLabel, formatRelativeDay, getLanguage, local, setLanguage, t } from './i18n.js';
+import { LANGUAGES, LANGUAGE_LABELS, applyStaticTexts, dayKeyOf, formatDayLabel, formatDuration, formatRelativeDay, getLanguage, local, setLanguage, t } from './i18n.js';
 import { buildIcs, downloadIcs } from './calendar.js';
 import { createZoneMap, getPosition, nearestPlaces, ZONE_COLORS } from './map.js';
+import { downloadBlob, renderPlanImage } from './share-image.js';
 import { toLatin } from './translit.js';
 
 const STORAGE_KEY = 'voda-watches';
@@ -60,6 +61,7 @@ const nodes = {
   watchEmpty: document.getElementById('watch-empty'),
   addDone: document.getElementById('add-done'),
   closures: document.getElementById('closures'),
+  weekGrid: document.getElementById('week-grid'),
   textSizeSwitch: document.getElementById('text-size-switch'),
   locateButton: document.getElementById('locate-button'),
   locateMessage: document.getElementById('locate-message'),
@@ -240,11 +242,12 @@ function statusFor(upcoming) {
   if (live) {
     const endsToday = formatRelativeDay(live.end) === formatRelativeDay(now);
     const until = endsToday ? endTimeText(live) : `${formatRelativeDay(live.end)} ${endTimeText(live)}`;
-    return { tone: 'bad', title: t('status.liveNow'), detail: t('status.until', { time: until }) };
+    return { tone: 'bad', title: t('status.liveNow'), detail: `${t('status.until', { time: until })} · ${t('count.left', { duration: formatDuration(live.end - now) })}` };
   }
   const next = upcoming[0];
   if (next) {
-    return { tone: 'warn', title: t('status.next'), detail: `${formatRelativeDay(next.start)} · ${formatWindow(next)}` };
+    const countdown = next.start - now < DAY_MS ? ` · ${t('count.in', { duration: formatDuration(next.start - now) })}` : '';
+    return { tone: 'warn', title: t('status.next'), detail: `${formatRelativeDay(next.start)} · ${formatWindow(next)}${countdown}` };
   }
   return { tone: 'ok', title: t('status.none'), detail: t('status.noneDetail') };
 }
@@ -292,8 +295,10 @@ function pastSummary(watch) {
   const now = Date.now();
   const hits = state.history.filter(closure => closure.end <= now && closure.end >= now - 30 * DAY_MS && watchMatchesClosure(watch, closure));
   if (hits.length === 0) return '';
-  const hours = Math.round(hits.reduce((total, closure) => total + (closure.end - closure.start), 0) / (60 * 60 * 1000));
-  return t('stats.last30', { count: hits.length, hours });
+  const totalMs = hits.reduce((total, closure) => total + (closure.end - closure.start), 0);
+  const hours = Math.round(totalMs / (60 * 60 * 1000));
+  const average = hits.length > 1 ? ` · ${t('stats.avg', { avg: Math.round(totalMs / hits.length / (60 * 60 * 1000)) })}` : '';
+  return `${t('stats.last30', { count: hits.length, hours })}${average}`;
 }
 
 // "No news" is not a problem. The notice only appears when the check itself fails: the site cannot be read, or the check has stopped running.
@@ -535,6 +540,58 @@ function renderNotices() {
   );
 }
 
+function closureArticle(closure) {
+  const now = Date.now();
+  const mine = closureMatches(closure);
+  const live = closure.start <= now && closure.end > now;
+  const past = closure.end <= now;
+  const badges = [el('span', { text: t('zone', { zone: closure.zone }), className: 'badge' })];
+  if (live) badges.push(el('span', { text: t('plan.live'), className: 'badge live' }));
+  if (mine) badges.push(el('span', { text: t('plan.mine'), className: 'badge mine' }));
+  return el('article', { className: `closure${mine ? ' mine' : ''}${past ? ' past' : ''}` }, [
+    el('div', { className: 'closure-head' }, [
+      el('span', { text: formatWindow(closure), className: 'closure-time' }),
+      el('span', { className: 'row' }, badges),
+    ]),
+    el('ul', {}, closure.lines.map(line => el('li', { text: local(line) }))),
+  ]);
+}
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function areaHeadings(lines) {
+  return lines.map(line => line.split(/\s*\(/)[0].replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+
+async function sharePlanImage(closures, button) {
+  button.disabled = true;
+  try {
+    const blob = await renderPlanImage({
+      title: t('img.title'),
+      day: capitalize(formatDayLabel(closures[0].start)),
+      items: closures.map(closure => ({
+        color: ZONE_COLORS[closure.zone],
+        zone: t('zone', { zone: closure.zone }),
+        window: formatWindow(closure),
+        areas: areaHeadings(closure.lines).map(local),
+      })),
+      footer: t('img.footer', { host: location.host }),
+      more: count => t('img.more', { count }),
+    });
+    const file = new File([blob], 'voda-plan.png', { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: t('app.title'), url: location.origin }).catch(() => undefined);
+    } else {
+      downloadBlob(blob, 'voda-plan.png');
+    }
+    trackEvent('share_image');
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderClosures() {
   const now = Date.now();
   const visible = state.plan.closures.filter(closure => closure.end > now - 6 * 60 * 60 * 1000);
@@ -542,24 +599,49 @@ function renderClosures() {
     nodes.closures.replaceChildren(el('p', { text: t('plan.none'), className: 'muted' }));
     return;
   }
+  const days = new Map();
+  for (const closure of visible) {
+    const key = dayKeyOf(closure.start);
+    days.set(key, [...(days.get(key) ?? []), closure]);
+  }
   nodes.closures.replaceChildren(
-    ...visible.map(closure => {
-      const mine = closureMatches(closure);
-      const live = closure.start <= now && closure.end > now;
-      const past = closure.end <= now;
-      const badges = [el('span', { text: t('zone', { zone: closure.zone }), className: 'badge' })];
-      if (live) badges.push(el('span', { text: t('plan.live'), className: 'badge live' }));
-      if (mine) badges.push(el('span', { text: t('plan.mine'), className: 'badge mine' }));
-      return el('article', { className: `closure${mine ? ' mine' : ''}${past ? ' past' : ''}` }, [
-        el('div', { className: 'closure-head' }, [
-          el('span', { text: formatWindow(closure), className: 'closure-time' }),
-          el('span', { className: 'row' }, badges),
-        ]),
-        el('p', { text: dayHeading(closure.start), className: 'muted' }),
-        el('ul', {}, closure.lines.map(line => el('li', { text: local(line) }))),
-      ]);
-    }),
+    ...[...days.values()].flatMap(items => [
+      el('div', { className: 'day-head' }, [
+        el('h3', { text: dayHeading(items[0].start) }),
+        linkButton(t('plan.shareImage'), event => sharePlanImage(items, event.currentTarget)),
+      ]),
+      ...items.map(closureArticle),
+    ]),
   );
+}
+
+function compactWindow(closure) {
+  return `${timeFormat.format(closure.start)}–${endTimeText(closure)}`;
+}
+
+// One row per day, one column per zone: a quick look at when it is a good day to do the laundry.
+function renderWeekGrid() {
+  const now = Date.now();
+  const cells = [el('span'), ...ZONE_NAMES.map(zone => el('span', { text: t('zone', { zone }), className: 'wg-head' }))];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = now + offset * DAY_MS;
+    const key = dayKeyOf(day);
+    const [weekday, date] = formatDayLabel(day).split(', ');
+    cells.push(el('span', { text: `${offset === 0 ? t('day.today') : offset === 1 ? t('day.tomorrow') : weekday}\n${date}`, className: 'wg-day' }));
+    for (const zone of ZONE_NAMES) {
+      const closures = state.plan.closures.filter(closure => closure.zone === zone && dayKeyOf(closure.start) === key).sort((first, second) => first.start - second.start);
+      const mine = closures.some(closureMatches);
+      const live = closures.some(closure => closure.start <= now && closure.end > now);
+      cells.push(
+        el(
+          'span',
+          { className: `wg-cell${mine ? ' mine' : ''}${live ? ' live' : ''}${closures.length === 0 ? ' empty' : ''}` },
+          closures.length === 0 ? [el('span', { text: '–' })] : closures.map(closure => el('span', { text: compactWindow(closure) })),
+        ),
+      );
+    }
+  }
+  nodes.weekGrid.replaceChildren(...cells);
 }
 
 function renderUpdated() {
@@ -586,6 +668,7 @@ function renderAll() {
   renderWatchList();
   renderNotices();
   renderClosures();
+  renderWeekGrid();
   renderAlertsState();
   renderInstallButton();
 }
@@ -1128,6 +1211,9 @@ async function init() {
     syncSubscription();
   }
   setTimeout(maybeOfferInstall, 3000);
+  setInterval(() => {
+    if (screenFromHash() === 'home' && !nodes.homeContent.contains(document.activeElement)) renderHome();
+  }, 30000);
   setInterval(loadDataQuietly, 5 * 60 * 1000);
 }
 
