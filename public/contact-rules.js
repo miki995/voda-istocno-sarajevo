@@ -7,7 +7,7 @@ const WATER_QUESTION = /(kad(a)? (ce|cu|ce li|ce nam|ima|se vrac|dolazi)|zasto (
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LINK = /https?:\/\/|www\./gi;
 
-export const LIMITS = { nameMin: 2, nameMax: 80, companyMax: 80, messageMin: 40, messageMax: 2000, links: 2 };
+export const LIMITS = { nameMin: 2, nameMax: 80, emailMax: 80, companyMax: 80, messageMin: 40, messageMax: 2000, links: 2 };
 
 function plain(value) {
   return toLatin(String(value ?? ''))
@@ -22,7 +22,7 @@ function plain(value) {
 export function checkContactMessage({ name, email, company, message, confirmed }) {
   const cleanName = String(name ?? '').trim();
   if (cleanName.length < LIMITS.nameMin || cleanName.length > LIMITS.nameMax) return 'name';
-  if (!EMAIL.test(String(email ?? '').trim()) || String(email).length > 120) return 'email';
+  if (!EMAIL.test(String(email ?? '').trim()) || String(email).trim().length > LIMITS.emailMax) return 'email';
   if (String(company ?? '').trim().length > LIMITS.companyMax) return 'company';
   const text = String(message ?? '').trim();
   if (text.length < LIMITS.messageMin) return 'short';
