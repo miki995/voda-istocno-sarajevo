@@ -440,3 +440,28 @@ button.wg-head { border-radius: 0; text-decoration: none; padding: 6px 2px 5px; 
 .week-grid.loading .wg-cell::after { display: none; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 @media (prefers-reduced-motion: reduce) { .sk, .week-grid.loading .wg-cell { animation: none; } }
+
+.home-card.has-art { position: relative; }
+.home-card.has-art .home-card-name, .home-card.has-art .home-card-title, .home-card.has-art .home-card-detail { padding-right: 74px; }
+.art { position: absolute; top: 12px; right: 12px; width: 68px; height: 68px; pointer-events: none; overflow: visible; }
+.art * { transform-box: fill-box; transform-origin: center; }
+.art-bob { animation: art-bob 2.6s ease-in-out infinite; transform-origin: 50% 90%; }
+.art-droop { animation: art-droop 3.4s ease-in-out infinite; transform-origin: 50% 100%; }
+.art .bubble { opacity: 0; animation: art-rise 3.2s ease-in infinite; }
+.art .b2 { animation-delay: 1.1s; }
+.art .b3 { animation-delay: 2.1s; }
+.art .spark { opacity: 0; animation: art-twinkle 2.4s ease-in-out infinite; }
+.art .s2 { animation-delay: 1.2s; }
+.art .tear { animation: art-tear 2.6s ease-in infinite; }
+.art .hand { transform-box: view-box; transform-origin: 60px 58px; animation: art-spin 8s linear infinite; }
+@keyframes art-bob { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-3px) scale(1.04, 0.97); } }
+@keyframes art-droop { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.02, 0.95) translateY(1px); } }
+@keyframes art-rise { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translateY(-24px) scale(1); opacity: 0; } }
+@keyframes art-twinkle { 0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; } 50% { transform: scale(1) rotate(45deg); opacity: 1; } }
+@keyframes art-tear { 0% { transform: translateY(-4px) scale(0.6); opacity: 0; } 25% { opacity: 1; transform: translateY(0) scale(1); } 100% { transform: translateY(22px); opacity: 0; } }
+@keyframes art-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .art *, .art-bob, .art-droop { animation: none !important; }
+  .art .bubble, .art .spark { opacity: 0.8; }
+  .art .tear { opacity: 1; }
+}

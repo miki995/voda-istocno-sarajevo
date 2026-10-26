@@ -4,6 +4,7 @@ import { buildIcs, downloadIcs } from './calendar.js';
 import { checkContactMessage } from './contact-rules.js';
 import { createZoneMap, getPosition, nearestPlaces, ZONE_COLORS } from './map.js';
 import { downloadBlob, renderWeekImage } from './share-image.js';
+import { statusArt } from './status-art.js';
 import { toLatin } from './translit.js';
 
 const STORAGE_KEY = 'voda-watches';
@@ -370,7 +371,8 @@ function homeCard(watch) {
   const upcoming = upcomingClosuresFor(watch);
   const status = statusFor(upcoming);
   const key = watchKey(watch);
-  const card = el('article', { className: `home-card tone-${status.tone}` }, [
+  const card = el('article', { className: `home-card has-art tone-${status.tone}` }, [
+    statusArt(status.tone),
     el('p', { className: 'home-card-name' }, nameParts(watch, watchZone(watch, upcoming))),
     el('p', { text: status.title, className: 'home-card-title' }),
     el('p', { text: status.detail, className: 'home-card-detail' }),
