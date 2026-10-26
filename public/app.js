@@ -42,6 +42,7 @@ const state = {
   placeCoords: [],
   zoneMap: null,
   textSize: loadTextSize(),
+  subscriptionKnown: false,
 };
 
 const nodes = {
@@ -546,7 +547,8 @@ function renderBanner() {
     return;
   }
   const mode = alertsMode();
-  if (state.subscription || (mode !== 'ready' && mode !== 'ios')) {
+  const unknownYet = mode === 'ready' && !state.subscriptionKnown;
+  if (state.subscription || unknownYet || (mode !== 'ready' && mode !== 'ios')) {
     nodes.homeBanner.replaceChildren();
     return;
   }
@@ -1387,6 +1389,19 @@ function trackVisit() {
   }).catch(() => {});
 }
 
+async function checkSubscription() {
+  try {
+    const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.register('/sw.js').catch(() => null) : null;
+    if (registration && pushSupported() && !isIosBrowserTab()) {
+      state.subscription = await registration.pushManager.getSubscription();
+    }
+  } finally {
+    state.subscriptionKnown = true;
+    renderAll();
+    if (state.subscription) syncSubscription();
+  }
+}
+
 async function init() {
   history.replaceState({ screen: screenFromHash(), depth: 0 }, '', location.href);
   document.documentElement.dataset.text = state.textSize;
@@ -1395,13 +1410,17 @@ async function init() {
   renderAll();
   initAnalytics();
   trackVisit();
+  // Whether alerts are already on is found out while the plan loads, so the "turn on alerts" banner does not flash
+  // for people who have them. If it takes too long the banner is shown anyway.
+  const subscriptionCheck = checkSubscription();
+  setTimeout(() => {
+    if (!state.subscriptionKnown) {
+      state.subscriptionKnown = true;
+      renderBanner();
+    }
+  }, 4000);
   await loadDataQuietly();
-  const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.register('/sw.js').catch(() => null) : null;
-  if (registration && pushSupported() && !isIosBrowserTab()) {
-    state.subscription = await registration.pushManager.getSubscription();
-    renderAll();
-    syncSubscription();
-  }
+  await subscriptionCheck;
   setTimeout(maybeOfferInstall, 3000);
   setInterval(() => {
     if (screenFromHash() === 'home' && !nodes.homeContent.contains(document.activeElement)) renderHome();
