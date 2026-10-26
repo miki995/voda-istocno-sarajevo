@@ -280,17 +280,6 @@ async function shareText(text, button) {
   setTimeout(() => { button.textContent = label; }, 1800);
 }
 
-function scheduleItem(closure, showZone, watch) {
-  const live = closure.start <= Date.now();
-  return el('li', {}, [
-    el('strong', { text: formatRelativeDay(closure.start) }),
-    el('span', { text: ` · ${formatWindow(closure)}` }),
-    ...(showZone ? [el('span', { text: ` · ${t('zone', { zone: closure.zone })}` })] : []),
-    ...(live ? [el('span', { text: t('plan.live'), className: 'badge live' })] : []),
-    ...(live ? [] : [linkButton(t('card.calendar'), () => addToCalendar(closure, watchLabel(watch)))]),
-  ]);
-}
-
 function pastSummary(watch) {
   const now = Date.now();
   const hits = state.history.filter(closure => closure.end <= now && closure.end >= now - 30 * DAY_MS && watchMatchesClosure(watch, closure));
@@ -349,7 +338,7 @@ function homeCard(watch) {
   if (upcoming.length > 1) {
     const details = el('details', { className: 'all-times', attrs: { 'data-key': key } }, [
       el('summary', { text: t('home.allTimes', { count: upcoming.length }) }),
-      el('ul', {}, upcoming.map(closure => scheduleItem(closure, watch.kind !== 'ZONE', watch))),
+      watchGrid(upcoming),
     ]);
     details.open = state.openDetails.has(key);
     details.addEventListener('toggle', () => {
@@ -619,29 +608,48 @@ function compactWindow(closure) {
   return `${timeFormat.format(closure.start)}–${endTimeText(closure)}`;
 }
 
+function dayCellLabel(offset, day) {
+  const [weekday, date] = formatDayLabel(day).split(', ');
+  return el('span', { text: `${offset === 0 ? t('day.today') : offset === 1 ? t('day.tomorrow') : weekday}\n${date}`, className: 'wg-day' });
+}
+
+// A closure belongs to the day it starts on; one that began yesterday and is still going belongs to today.
+function closuresOnDay(closures, offset, now) {
+  const key = dayKeyOf(now + offset * DAY_MS);
+  return closures.filter(closure => dayKeyOf(closure.start) === key || (offset === 0 && closure.start <= now && closure.end > now)).sort((first, second) => first.start - second.start);
+}
+
+function windowsCell(closures, now, extraClass = '') {
+  const mine = closures.some(closureMatches);
+  const live = closures.some(closure => closure.start <= now && closure.end > now);
+  return el(
+    'span',
+    { className: `wg-cell${extraClass}${mine ? ' mine' : ''}${live ? ' live' : ''}${closures.length === 0 ? ' empty' : ''}` },
+    closures.length === 0 ? [el('span', { text: '–' })] : closures.map(closure => el('span', { text: compactWindow(closure) })),
+  );
+}
+
 // One row per day, one column per zone: a quick look at when it is a good day to do the laundry.
 function renderWeekGrid() {
   const now = Date.now();
   const cells = [el('span'), ...ZONE_NAMES.map(zone => el('span', { text: t('zone', { zone }), className: 'wg-head' }))];
   for (let offset = 0; offset < 7; offset += 1) {
-    const day = now + offset * DAY_MS;
-    const key = dayKeyOf(day);
-    const [weekday, date] = formatDayLabel(day).split(', ');
-    cells.push(el('span', { text: `${offset === 0 ? t('day.today') : offset === 1 ? t('day.tomorrow') : weekday}\n${date}`, className: 'wg-day' }));
+    cells.push(dayCellLabel(offset, now + offset * DAY_MS));
     for (const zone of ZONE_NAMES) {
-      const closures = state.plan.closures.filter(closure => closure.zone === zone && dayKeyOf(closure.start) === key).sort((first, second) => first.start - second.start);
-      const mine = closures.some(closureMatches);
-      const live = closures.some(closure => closure.start <= now && closure.end > now);
-      cells.push(
-        el(
-          'span',
-          { className: `wg-cell${mine ? ' mine' : ''}${live ? ' live' : ''}${closures.length === 0 ? ' empty' : ''}` },
-          closures.length === 0 ? [el('span', { text: '–' })] : closures.map(closure => el('span', { text: compactWindow(closure) })),
-        ),
-      );
+      cells.push(windowsCell(closuresOnDay(state.plan.closures.filter(closure => closure.zone === zone), offset, now), now));
     }
   }
   nodes.weekGrid.replaceChildren(...cells);
+}
+
+// The same grid for one street or zone: the seven days and the hours without water.
+function watchGrid(closures) {
+  const now = Date.now();
+  const cells = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    cells.push(dayCellLabel(offset, now + offset * DAY_MS), windowsCell(closuresOnDay(closures, offset, now), now, ' row'));
+  }
+  return el('div', { className: 'week-grid single' }, cells);
 }
 
 function renderUpdated() {

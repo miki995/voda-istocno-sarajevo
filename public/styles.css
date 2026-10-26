@@ -379,3 +379,5 @@ html[data-text='xlarge'] { font-size: 136%; }
 .wg-cell.empty { color: var(--muted); }
 .day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
 .day-head h3 { margin: 0; font-size: 1.05rem; }
+.week-grid.single { grid-template-columns: 76px 1fr; margin: 12px 0 0; }
+.wg-cell.row { flex-direction: row; justify-content: center; flex-wrap: wrap; gap: 4px 16px; }
