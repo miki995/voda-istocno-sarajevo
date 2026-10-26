@@ -1,6 +1,6 @@
 import { checkContactMessage } from '../public/contact-rules.js';
 import { sendContactMail } from '../src/health.js';
-import { allowStrict } from '../src/ratelimit.js';
+import { allowStrict, refund } from '../src/ratelimit.js';
 import { getStore } from '../src/store.js';
 import { dayKey } from '../src/time.js';
 import { readBody, sendJson } from '../src/http.js';
@@ -46,11 +46,14 @@ export default async function handler(req, res) {
     }
     if (reserved > DAILY_LIMIT) {
       await store.decr(key);
+      await refund(store, 'contact', req, 3600);
       return sendJson(res, 429, { ok: false, reason: 'rate' });
     }
     const result = await sendContactMail(process.env, input).catch(() => ({ ok: false }));
     if (!result.ok) {
+      // our failure (for example the address for the mail is not set): neither the day nor the person pays for it
       await store.decr(key);
+      await refund(store, 'contact', req, 3600);
     }
     return sendJson(res, result.ok ? 200 : 502, { ok: result.ok });
   } catch {

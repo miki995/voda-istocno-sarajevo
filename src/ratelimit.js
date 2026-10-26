@@ -9,8 +9,12 @@ export function clientIp(req) {
   return header('x-vercel-forwarded-for')[0] ?? header('x-real-ip')[0] ?? header('x-forwarded-for').at(-1) ?? req.socket?.remoteAddress ?? 'unknown';
 }
 
+function counterKey(name, req, windowSeconds, now) {
+  return `rl:${name}:${clientIp(req)}:${Math.floor(now / (windowSeconds * 1000))}`;
+}
+
 async function count(store, name, req, windowSeconds, now) {
-  const key = `rl:${name}:${clientIp(req)}:${Math.floor(now / (windowSeconds * 1000))}`;
+  const key = counterKey(name, req, windowSeconds, now);
   const used = await store.incr(key);
   if (used === 1) {
     await store.expire(key, windowSeconds * 2);
@@ -30,6 +34,15 @@ export async function allow(store, name, req, limit, windowSeconds = 60, now = D
 // Fails closed: for endpoints that cost something (they send mail), an unreachable store is an error, not a free pass.
 export async function allowStrict(store, name, req, limit, windowSeconds = 60, now = Date.now()) {
   return (await count(store, name, req, windowSeconds, now)) <= limit;
+}
+
+// Hands back one try, for when the failure was ours and not the caller's.
+export async function refund(store, name, req, windowSeconds = 60, now = Date.now()) {
+  try {
+    await store.decr(counterKey(name, req, windowSeconds, now));
+  } catch {
+    // nothing to hand back if the store is unreachable
+  }
 }
 
 // true when this caller has used up its allowance for the current window
