@@ -166,6 +166,29 @@ function iconTile(name, tone) {
   return tile;
 }
 
+function zoneDot(zone) {
+  const dot = el('i', { className: 'zone-dot' });
+  dot.style.background = ZONE_COLORS[zone] ?? '#8e8e93';
+  return dot;
+}
+
+function zoneOfPlace(place) {
+  const key = fold(place);
+  return ZONE_NAMES.find(zone => (state.zonePlaces[zone] ?? []).some(candidate => fold(candidate) === key)) ?? null;
+}
+
+function watchZone(watch, upcoming = []) {
+  return watch.kind === 'ZONE' ? watch.value : zoneOfPlace(watch.value) ?? upcoming[0]?.zone ?? null;
+}
+
+function nameParts(watch, zone) {
+  return [
+    ...(zone ? [zoneDot(zone)] : []),
+    el('span', { text: watchLabel(watch) }),
+    ...(zone && watch.kind !== 'ZONE' ? [el('span', { text: ` · ${t('zone', { zone })}`, className: 'muted' })] : []),
+  ];
+}
+
 function watchKey(watch) {
   return watch.kind === 'ZONE' ? `ZONE:${watch.value}` : `PLACE:${fold(watch.value)}`;
 }
@@ -323,7 +346,7 @@ function homeCard(watch) {
   const status = statusFor(upcoming);
   const key = watchKey(watch);
   const card = el('article', { className: `home-card tone-${status.tone}` }, [
-    el('p', { text: watchLabel(watch), className: 'home-card-name' }),
+    el('p', { className: 'home-card-name' }, nameParts(watch, watchZone(watch, upcoming))),
     el('p', { text: status.title, className: 'home-card-title' }),
     el('p', { text: status.detail, className: 'home-card-detail' }),
   ]);
@@ -498,7 +521,7 @@ function renderWatchList() {
     ...state.watches.map(watch =>
       el('li', { className: 'watch-item' }, [
         el('div', { className: 'watch-head' }, [
-          el('span', { text: watchLabel(watch), className: 'watch-name' }),
+          el('span', { className: 'watch-name' }, nameParts(watch, watchZone(watch))),
           el('button', {
             text: '×',
             className: 'watch-remove',
@@ -540,7 +563,7 @@ function renderZoneSheet() {
   nodes.zoneSheet.hidden = openZone === null;
   nodes.zoneBackdrop.hidden = openZone === null;
   if (openZone === null) return;
-  nodes.zoneSheetTitle.textContent = t('zone', { zone: openZone });
+  nodes.zoneSheetTitle.replaceChildren(zoneDot(openZone), document.createTextNode(t('zone', { zone: openZone })));
   const places = [...(state.zonePlaces[openZone] ?? [])].sort((first, second) => first.localeCompare(second, 'sr'));
   nodes.zoneSheetPlaces.replaceChildren(
     ...(places.length === 0
@@ -623,14 +646,16 @@ function closuresOnDay(closures, offset, now) {
   return closures.filter(closure => dayKeyOf(closure.start) === key || (offset === 0 && closure.start <= now && closure.end > now)).sort((first, second) => first.start - second.start);
 }
 
-function windowsCell(closures, now, extraClass = '') {
+function windowsCell(closures, now, zone) {
   const mine = closures.some(closureMatches);
   const live = closures.some(closure => closure.start <= now && closure.end > now);
-  return el(
+  const cell = el(
     'span',
-    { className: `wg-cell${extraClass}${mine ? ' mine' : ''}${live ? ' live' : ''}${closures.length === 0 ? ' empty' : ''}` },
+    { className: `wg-cell${mine ? ' mine' : ''}${live ? ' live' : ''}${closures.length === 0 ? ' empty' : ''}` },
     closures.length === 0 ? [el('span', { text: '–' })] : closures.map(closure => el('span', { text: compactWindow(closure) })),
   );
+  cell.style.setProperty('--zone', ZONE_COLORS[zone]);
+  return cell;
 }
 
 // One row per day, one column per zone: a quick look at when it is a good day to do the laundry.
@@ -640,12 +665,16 @@ function renderWeekGrid() {
   nodes.planNone.textContent = t('plan.none');
   const cells = [
     el('span'),
-    ...ZONE_NAMES.map(zone => el('button', { text: t('zone', { zone }), className: 'wg-head', attrs: { type: 'button' }, onClick: () => openZoneSheet(zone) })),
+    ...ZONE_NAMES.map(zone => {
+      const head = el('button', { text: t('zone', { zone }), className: 'wg-head', attrs: { type: 'button' }, onClick: () => openZoneSheet(zone) });
+      head.style.setProperty('--zone', ZONE_COLORS[zone]);
+      return head;
+    }),
   ];
   for (let offset = 0; offset < 7; offset += 1) {
     cells.push(dayCellLabel(offset, now + offset * DAY_MS));
     for (const zone of ZONE_NAMES) {
-      cells.push(windowsCell(closuresOnDay(state.plan.closures.filter(closure => closure.zone === zone), offset, now), now));
+      cells.push(windowsCell(closuresOnDay(state.plan.closures.filter(closure => closure.zone === zone), offset, now), now, zone));
     }
   }
   nodes.weekGrid.replaceChildren(...cells);
@@ -759,7 +788,7 @@ function renderSuggestions() {
   const items = allSuggestions(query);
   const typed = query.trim();
   const showTyped = fold(typed).length >= 3 && !items.some(item => fold(item.place) === fold(typed));
-  const rows = items.map(item => ({ value: item.place, tag: t('zone', { zone: item.zone }) }));
+  const rows = items.map(item => ({ value: item.place, tag: t('zone', { zone: item.zone }), zone: item.zone }));
   if (showTyped) rows.push({ value: toLatin(typed), tag: t('watch.addTyped') });
   suggestionValues = rows.map(row => row.value);
   activeSuggestion = -1;
@@ -769,7 +798,7 @@ function renderSuggestions() {
       el(
         'li',
         { attrs: { id: `suggestion-${index}`, role: 'option', 'aria-selected': 'false' } },
-        [el('span', { text: local(row.value) }), el('span', { text: row.tag, className: 'tag' })],
+        [el('span', { text: local(row.value) }), el('span', { className: 'tag' }, [...(row.zone ? [zoneDot(row.zone)] : []), document.createTextNode(row.tag)])],
       ),
     ),
   );
