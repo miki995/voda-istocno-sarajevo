@@ -6,6 +6,7 @@ import { dayKey } from './time.js';
 import { normalizeLanguage } from './messages.js';
 import { noticeNotifications, planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
+import { checkHealth } from './health.js';
 import zonesSeed from './zones-seed.json' with { type: 'json' };
 
 const SOURCE_URL = 'https://vikis.info/';
@@ -67,6 +68,17 @@ async function fetchText(url) {
     throw new Error(`${url} answered ${response.status}`);
   }
   return response.text();
+}
+
+// The site is read by pattern, so a changed layout shows up as a page we can no longer make sense of.
+function findProblem(homeHtml, parsed) {
+  if (parsed.unparsedHeaders.length > 0) {
+    return { kind: 'unparsed-header', detail: ['Zaglavlja koja parser ne razumije:', ...parsed.unparsedHeaders].join('\n') };
+  }
+  if (parseCalendarEvents(homeHtml).length === 0 && parsed.closures.length === 0) {
+    return { kind: 'layout-changed', detail: 'Na početnoj stranici nema ni kalendara ni plana redukcije. Moguće je da se promijenio izgled sajta.' };
+  }
+  return null;
 }
 
 function reportUnparsed(headers) {
@@ -142,6 +154,7 @@ export async function refreshPlan(store, now) {
   const closuresChanged = JSON.stringify(previous.closures) !== JSON.stringify(closures);
   const noticesChanged = JSON.stringify(previous.notices) !== JSON.stringify(notices);
   const plan = { fetchedAt: now, status: parsed.status, closures, notices };
+  const problem = findProblem(homeHtml, parsed);
 
   if (closuresChanged || noticesChanged || now - previous.fetchedAt > HOUR_MS) {
     await store.set('plan', plan);
@@ -149,7 +162,7 @@ export async function refreshPlan(store, now) {
   if (closuresChanged) {
     await store.set('zonePlaces', mergePlacesByZone(await loadZonePlaces(store), closures));
   }
-  return plan;
+  return { plan, problem };
 }
 
 async function sendPush(env, subscription, message) {
@@ -204,12 +217,18 @@ export async function dispatchNotifications(store, env, plan, now) {
 
 export async function runCron(store, env, now = Date.now()) {
   let planError = '';
-  const plan = await refreshPlan(store, now).catch(async error => {
+  let problem = null;
+  let plan;
+  try {
+    ({ plan, problem } = await refreshPlan(store, now));
+  } catch (error) {
     planError = error.message;
-    return loadPlan(store);
-  });
+    problem = { kind: 'fetch-failed', detail: `vikis.info se ne može učitati: ${error.message}` };
+    plan = await loadPlan(store);
+  }
   const delivered = await dispatchNotifications(store, env, plan, now);
-  return { closures: plan.closures.length, notices: plan.notices.length, delivered, planError };
+  const health = await checkHealth(store, env, problem, now).catch(error => `health check failed: ${error.message}`);
+  return { closures: plan.closures.length, notices: plan.notices.length, delivered, planError, health };
 }
 
 export async function saveSubscription(store, subscription, rawWatches, lang) {
@@ -219,6 +238,7 @@ export async function saveSubscription(store, subscription, rawWatches, lang) {
   const plan = await loadPlan(store);
   const alreadyKnown = [
     ...plan.closures.map(closure => `${closure.id}|PUBLISHED`),
+    ...plan.closures.filter(closure => closure.end <= Date.now()).map(closure => `${closure.id}|RESTORED`),
     ...plan.notices.map(notice => `${notice.id}|NOTICE`),
   ];
   const sent = [...new Set([...(existing?.sent ?? []), ...alreadyKnown])];

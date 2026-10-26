@@ -2,7 +2,7 @@
 
 Water outage alerts for Istočno Sarajevo. Pick your streets, neighbourhoods or a whole zone and get a push notification when the water is about to be cut. The data comes from the reduction plan published on https://vikis.info/ ("Servisne informacije").
 
-The site is available in Serbian (default, Latin script) and English. Serbian is always the default, whatever the browser language is; English is optional and chosen with the switch in the menu (the choice is remembered). The language also decides the language of the push notifications.
+The site is available in Serbian (default in Cyrillic, with a Latin option in the menu) and English. Serbian is always the default, whatever the browser language is; English is optional and chosen with the switch in the menu (the choice is remembered). The language also decides the language of the push notifications.
 
 ## How it works
 

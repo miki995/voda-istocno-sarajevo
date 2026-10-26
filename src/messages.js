@@ -1,4 +1,6 @@
-export const LANGUAGES = ['sr', 'en'];
+// 'sr' is Serbian in Cyrillic (the default), 'sr-Latn' is Serbian in Latin. The Serbian texts below are
+// written in Latin and turned into Cyrillic when a notification is built.
+export const LANGUAGES = ['sr', 'sr-Latn', 'en'];
 export const DEFAULT_LANGUAGE = 'sr';
 
 const MESSAGES = {
@@ -6,6 +8,7 @@ const MESSAGES = {
     zone: zone => `Zona ${zone}`,
     soon: minutes => `Voda nestaje za oko ${minutes} min`,
     morning: 'Danas nema vode',
+    restored: 'Redukcija završena – voda se vraća',
     notice: {
       breakdown: where => `Vanredno obavještenje – ${where}`,
       shutdown: where => `Najava isključenja – ${where}`,
@@ -18,6 +21,7 @@ const MESSAGES = {
     zone: zone => `Zone ${zone}`,
     soon: minutes => `Water cuts off in about ${minutes} min`,
     morning: 'No water today',
+    restored: 'Outage over – water is coming back',
     notice: {
       breakdown: where => `Water utility notice – ${where}`,
       shutdown: where => `Planned shutdown – ${where}`,
@@ -32,6 +36,10 @@ export function normalizeLanguage(lang) {
   return LANGUAGES.includes(lang) ? lang : DEFAULT_LANGUAGE;
 }
 
+export function usesCyrillic(lang) {
+  return normalizeLanguage(lang) === 'sr';
+}
+
 export function messagesFor(lang) {
-  return MESSAGES[normalizeLanguage(lang)];
+  return MESSAGES[normalizeLanguage(lang) === 'en' ? 'en' : 'sr'];
 }

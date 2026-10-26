@@ -337,3 +337,11 @@ input[type='search']:focus { outline: none; box-shadow: var(--focus); }
 .notice.mine { background: var(--orange-tint); }
 .notice .closure-head { margin-bottom: 4px; }
 .notice-card .home-card-detail { font-size: 0.94rem; font-weight: 400; color: var(--text); }
+
+.tile-green { background: linear-gradient(180deg, #5fd57a, #34c759); }
+
+.card-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 12px; }
+.link-btn { font: inherit; font-size: 0.94rem; font-weight: 500; color: var(--blue); background: none; border: 0; padding: 4px 0; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.link-btn:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+.all-times .link-btn { margin-left: 8px; font-size: 0.88rem; padding: 0; }

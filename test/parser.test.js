@@ -8,6 +8,7 @@ import { getStore } from '../src/store.js';
 import { extractPlaces, mergePlacesByZone, parsePlan } from '../src/parser.js';
 import { matchedWatches, noticeNotifications, planNotifications, pruneSent } from '../src/notify.js';
 import { fold } from '../src/text.js';
+import { toCyrillic, toLatin } from '../public/translit.js';
 import { formatEndTime, localEpoch } from '../src/time.js';
 
 const html = readFileSync(new URL('./fixture-home.html', import.meta.url), 'utf8');
@@ -134,6 +135,7 @@ describe('matching and notifications', () => {
       watches: [{ kind: 'PLACE', value: 'Dobrinja IV' }],
       sent: [],
       now,
+      lang: 'sr-Latn',
     });
     assert.equal(result.length, 1);
     assert.match(result[0].title, /nestaje za oko 90 min/);
@@ -153,6 +155,17 @@ describe('matching and notifications', () => {
     assert.match(notification.body, /Zone III/);
   });
 
+  it('writes the notification in Cyrillic by default and in Latin when asked to', () => {
+    const now = localEpoch(2026, 10, 21, 9, 0);
+    const args = { closures: plan.closures, watches: [{ kind: 'ZONE', value: 'III' }], sent: [], now };
+    const [cyrillic] = planNotifications(args);
+    assert.match(cyrillic.title, /Вода нестаје за око 90 мин/);
+    assert.match(cyrillic.body, /Зона III/);
+    const [latin] = planNotifications({ ...args, lang: 'sr-Latn' });
+    assert.match(latin.title, /Voda nestaje za oko 90 min/);
+    assert.match(latin.body, /Zona III/);
+  });
+
   it('falls back to Serbian for an unknown language', () => {
     const now = localEpoch(2026, 10, 21, 9, 0);
     const [notification] = planNotifications({
@@ -162,7 +175,7 @@ describe('matching and notifications', () => {
       now,
       lang: 'de',
     });
-    assert.match(notification.body, /Zona III/);
+    assert.match(notification.body, /Зона III/);
   });
 
   it('does not repeat a notification', () => {
@@ -190,7 +203,7 @@ describe('matching and notifications', () => {
   });
 
   it('skips closures that already ended', () => {
-    const now = localEpoch(2026, 10, 21, 13, 0);
+    const now = localEpoch(2026, 10, 21, 18, 0);
     const closure = plan.closures[0];
     const result = planNotifications({ closures: [closure], watches: [{ kind: 'ZONE', value: 'II' }], sent: [], now });
     assert.equal(result.length, 0);
@@ -225,7 +238,7 @@ describe('utility notices', () => {
   it('notifies only people whose street is mentioned', () => {
     const mine = noticeNotifications({ notices: [notice], watches: [{ kind: 'PLACE', value: 'Radulovac' }], sent: [], now });
     assert.equal(mine.length, 1);
-    assert.match(mine[0].title, /Najava isključenja – Radulovac/);
+    assert.match(mine[0].title, /Најава искључења – Радуловац/);
     assert.deepEqual(mine[0].markSent, ['notice-652|NOTICE']);
     assert.equal(noticeNotifications({ notices: [notice], watches: [{ kind: 'PLACE', value: 'Dobrinja IV' }], sent: [], now }).length, 0);
     assert.equal(noticeNotifications({ notices: [notice], watches: [{ kind: 'ZONE', value: 'I' }], sent: [], now }).length, 0);
@@ -301,11 +314,31 @@ describe('closures the parser cannot read', () => {
     assert.equal(notices.length, 2);
     assert.equal(notices.find(item => item.title.includes('PAVLOVAC')).kind, 'closure');
     const [alert] = noticeNotifications({ notices, watches: [{ kind: 'PLACE', value: 'Kninska' }], sent: [], now: localEpoch(2026, 10, 22, 9, 0) });
-    assert.match(alert.title, /Zatvaranje vode – Kninska/);
+    assert.match(alert.title, /Затварање воде – Книнска/);
   });
 
   it('gives the same notice the same id every time', () => {
     assert.equal(extrasToNotices(result.extras, '2026-10-22', '656')[0].id, extrasToNotices(result.extras, '2026-10-22', '656')[0].id);
+  });
+});
+
+describe('script conversion', () => {
+  it('turns Latin into Cyrillic, including digraphs', () => {
+    assert.equal(toCyrillic('Njegoševa, Ljubović, Džamija, Đure Jakšića'), 'Његошева, Љубовић, Џамија, Ђуре Јакшића');
+    assert.equal(toCyrillic('NJEGOŠEVA'), 'ЊЕГОШЕВА');
+  });
+
+  it('keeps zone numerals and product names in Latin letters', () => {
+    assert.equal(toCyrillic('Zona II, Dobrinja IV, Na iPhone-u'), 'Зона II, Добриња IV, На iPhone-у');
+    assert.equal(toCyrillic('i ostalo'), 'и остало');
+  });
+
+  it('turns Cyrillic back into Latin', () => {
+    assert.equal(toLatin('Његошева, Ђуре Јакшића, Џамија'), 'Njegoševa, Đure Jakšića, Džamija');
+  });
+
+  it('matches a street typed in Cyrillic', () => {
+    assert.deepEqual(matchedWatches(plan.closures[0], [{ kind: 'PLACE', value: 'Ђуре Јакшића' }]), ['Ђуре Јакшића']);
   });
 });
 
@@ -324,7 +357,7 @@ describe('usage statistics', () => {
     await recordHit(store, { visitor: 'visitor-one', lang: 'sr', standalone: false }, now);
     await recordHit(store, { visitor: 'visitor-two', lang: 'en', standalone: false }, now);
     const stats = await loadStats(store, now, 2);
-    assert.deepEqual(stats.days[0], { day: '2026-10-23', visitors: 2, opens: 3, appOpens: 1, sr: 2, en: 1 });
+    assert.deepEqual(stats.days[0], { day: '2026-10-23', visitors: 2, opens: 3, appOpens: 1, sr: 2, srLatn: 0, en: 1 });
     assert.equal(stats.days[1].visitors, 0);
   });
 });

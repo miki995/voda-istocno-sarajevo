@@ -1,8 +1,11 @@
-import { DEFAULT_LANGUAGE, messagesFor } from './messages.js';
+import { toCyrillic } from '../public/translit.js';
+import { DEFAULT_LANGUAGE, messagesFor, usesCyrillic } from './messages.js';
 import { mentions } from './text.js';
 import { dayKey, formatDay, formatEndTime, formatTime, localParts } from './time.js';
 
 export const LEAD_MS = 2 * 60 * 60 * 1000;
+export const RESTORED_WINDOW_MS = 2 * 60 * 60 * 1000;
+const CONTINUATION_GAP_MS = 15 * 60 * 1000;
 export const MORNING_HOUR = 7;
 
 const KIND_PRIORITY = ['SOON', 'MORNING', 'PUBLISHED'];
@@ -39,6 +42,10 @@ function dueKinds(closure, sent, now) {
   return kinds;
 }
 
+function localized(message, lang) {
+  return usesCyrillic(lang) ? { title: toCyrillic(message.title), body: toCyrillic(message.body) } : message;
+}
+
 function buildMessage(kind, closure, labels, now, lang) {
   const messages = messagesFor(lang);
   const window = `${formatTime(closure.start)}–${formatEndTime(closure.start, closure.end)}`;
@@ -54,10 +61,39 @@ function buildMessage(kind, closure, labels, now, lang) {
   return { title: messages.published(formatDay(closure.start), window), body: `${zone} – ${where}` };
 }
 
+// A closure that ends exactly when another one for the same street starts is not the end of the outage.
+function continuedByAnother(closure, closures, watches) {
+  return closures.some(
+    other => other.id !== closure.id && other.start <= closure.end + CONTINUATION_GAP_MS && other.end > closure.end && matchedWatches(other, watches).length > 0,
+  );
+}
+
+function restoredNotification(closure, closures, watches, sent, now, lang) {
+  const recentlyEnded = closure.end <= now && now - closure.end <= RESTORED_WINDOW_MS;
+  if (!recentlyEnded || sent.includes(`${closure.id}|RESTORED`) || continuedByAnother(closure, closures, watches)) {
+    return null;
+  }
+  const labels = matchedWatches(closure, watches, lang);
+  if (labels.length === 0) {
+    return null;
+  }
+  const window = `${formatTime(closure.start)}–${formatEndTime(closure.start, closure.end)}`;
+  return {
+    closureId: closure.id,
+    tag: `${closure.id}-RESTORED`,
+    markSent: [`${closure.id}|RESTORED`],
+    ...localized({ title: messagesFor(lang).restored, body: `${window} (${messagesFor(lang).zone(closure.zone)}) – ${labels.join(', ')}` }, lang),
+  };
+}
+
 export function planNotifications({ closures, watches, sent, now, lang = DEFAULT_LANGUAGE }) {
   const notifications = [];
   for (const closure of closures) {
     if (closure.end <= now) {
+      const restored = restoredNotification(closure, closures, watches, sent, now, lang);
+      if (restored) {
+        notifications.push(restored);
+      }
       continue;
     }
     const labels = matchedWatches(closure, watches, lang);
@@ -70,7 +106,7 @@ export function planNotifications({ closures, watches, sent, now, lang = DEFAULT
       closureId: closure.id,
       tag: `${closure.id}-${kind}`,
       markSent: kinds.map(dueKind => `${closure.id}|${dueKind}`),
-      ...buildMessage(kind, closure, labels, now, lang),
+      ...localized(buildMessage(kind, closure, labels, now, lang), lang),
     });
   }
   return notifications;
@@ -92,8 +128,7 @@ export function noticeNotifications({ notices, watches, sent, now, lang = DEFAUL
       return [{
         tag: notice.id,
         markSent: [`${notice.id}|NOTICE`],
-        title: (messages.notice[notice.kind] ?? messages.notice.breakdown)(labels.join(', ')),
-        body: summary,
+        ...localized({ title: (messages.notice[notice.kind] ?? messages.notice.breakdown)(labels.join(', ')), body: summary }, lang),
       }];
     });
 }

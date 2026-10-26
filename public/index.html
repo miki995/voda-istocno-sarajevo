@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="sr-Latn">
+<html lang="sr-Cyrl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,6 +7,7 @@
   <meta name="description" content="Obavještenja o nestanku vode u Istočnom Sarajevu za tvoju ulicu ili zonu.">
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Voda ISA">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -78,6 +79,12 @@
           <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </li>
+      <li>
+        <button id="menu-share" class="menu-row" type="button">
+          <span class="tile tile-green" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span>
+          <span class="menu-label" data-i18n="menu.share">Podijeli aplikaciju</span>
+        </button>
+      </li>
       <li class="menu-row static">
         <span class="tile tile-gray" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
         <span class="menu-label" data-i18n="menu.language">Jezik</span>
@@ -103,7 +110,7 @@
       <p class="muted" data-i18n="watch.help">Dobijaš poruku čim se plan objavi, ujutru na dan zatvaranja i oko 2 sata prije nego što voda nestane.</p>
       <div class="search">
         <label class="sr-only" for="search-input" data-i18n="watch.searchLabel">Pretraži ulicu ili naselje</label>
-        <input id="search-input" type="search" inputmode="search" autocomplete="off" autocapitalize="off" placeholder="Ukucaj ulicu ili naselje…" data-i18n-placeholder="watch.placeholder">
+        <input id="search-input" type="search" inputmode="search" autocomplete="off" autocapitalize="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" placeholder="Ukucaj ulicu ili naselje…" data-i18n-placeholder="watch.placeholder">
         <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
       </div>
       <div class="zone-picker" id="zone-picker" role="group" data-i18n-label="watch.zoneGroup" aria-label="Izaberi cijelu zonu"></div>

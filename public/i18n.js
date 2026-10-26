@@ -1,6 +1,12 @@
-export const LANGUAGES = ['sr', 'en'];
+import { toCyrillic } from './translit.js';
+
+// 'sr' is Serbian in Cyrillic (the default), 'sr-Latn' is Serbian in Latin. The Serbian texts are
+// written in Latin and turned into Cyrillic on the way out.
+export const LANGUAGES = ['sr', 'sr-Latn', 'en'];
+export const LANGUAGE_LABELS = { sr: 'ЋИР', 'sr-Latn': 'LAT', en: 'EN' };
 const DEFAULT_LANGUAGE = 'sr';
 const STORAGE_KEY = 'voda-lang';
+const HTML_LANG = { sr: 'sr-Cyrl', 'sr-Latn': 'sr-Latn', en: 'en' };
 
 const DICTIONARY = {
   sr: {
@@ -36,7 +42,7 @@ const DICTIONARY = {
     'alerts.title': 'Obavještenja',
     'alerts.enable': 'Uključi obavještenja',
     'alerts.disable': 'Isključi obavještenja',
-    'alerts.ios': 'Na iPhoneu obavještenja rade tek kad sajt dodaš na početni ekran.',
+    'alerts.ios': 'Na iPhone-u obavještenja rade tek kad sajt dodaš na početni ekran.',
     'alerts.iosHint': 'Safari → dugme Podijeli → "Dodaj na početni ekran", pa otvori sajt odatle i uključi obavještenja.',
     'alerts.unsupported': 'Ovaj preglednik ne podržava obavještenja. Plan i dalje možeš pratiti na ovoj stranici.',
     'alerts.blocked': 'Obavještenja su blokirana u postavkama preglednika. Dozvoli ih za ovaj sajt pa osvježi stranicu.',
@@ -81,6 +87,15 @@ const DICTIONARY = {
     'zones.help': 'Spisak se dopunjuje iz svakog objavljenog plana. Dodirni ulicu da je dodaš.',
     'zones.count': '{count} mjesta',
     'zone': 'Zona {zone}',
+    'card.calendar': 'Dodaj u kalendar',
+    'card.share': 'Podijeli',
+    'share.copied': 'Kopirano',
+    'share.cardText': '{name}: {title}, {detail}',
+    'share.appText': 'Obavještenja o nestanku vode u Istočnom Sarajevu za tvoju ulicu:',
+    'menu.share': 'Podijeli aplikaciju',
+    'cal.title': 'Nema vode – {name}',
+    'cal.description': 'Planirana redukcija vode prema planu vodovoda Istočno Sarajevo.',
+    'plan.offline': 'Nema interneta · ažurirano {time}',
     'footer.source': 'Izvor:',
     'footer.official': 'službeni sajt vodovoda Istočno Sarajevo.',
   },
@@ -162,6 +177,15 @@ const DICTIONARY = {
     'zones.help': 'The list grows with every published plan. Tap a street to add it.',
     'zones.count': '{count} places',
     'zone': 'Zone {zone}',
+    'card.calendar': 'Add to calendar',
+    'card.share': 'Share',
+    'share.copied': 'Copied',
+    'share.cardText': '{name}: {title}, {detail}',
+    'share.appText': 'Water outage alerts for Istočno Sarajevo, for your street:',
+    'menu.share': 'Share the app',
+    'cal.title': 'No water – {name}',
+    'cal.description': 'Planned water outage from the Istočno Sarajevo water utility plan.',
+    'plan.offline': 'Offline · updated {time}',
     'footer.source': 'Source:',
     'footer.official': 'the official website of the Istočno Sarajevo water utility.',
   },
@@ -199,15 +223,21 @@ export function setLanguage(lang) {
   }
 }
 
+// Serbian text that comes from the site (street names, notices) is Latin; show it in the chosen script.
+export function local(text) {
+  return currentLanguage === 'sr' ? toCyrillic(text) : text;
+}
+
 export function t(key, values = {}) {
-  const template = DICTIONARY[currentLanguage][key] ?? DICTIONARY[DEFAULT_LANGUAGE][key] ?? key;
-  return template.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? ''));
+  const dictionary = DICTIONARY[currentLanguage === 'en' ? 'en' : 'sr'];
+  const template = dictionary[key] ?? DICTIONARY[DEFAULT_LANGUAGE][key] ?? key;
+  return local(template.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? '')));
 }
 
 export function formatDayLabel(epochMs) {
   if (currentLanguage === 'en') return englishDayFormat.format(epochMs);
   const parts = Object.fromEntries(dayPartsFormat.formatToParts(new Date(epochMs)).map(part => [part.type, part.value]));
-  return `${WEEKDAYS_SR[WEEKDAY_INDEX[parts.weekday]]}, ${parts.day}.${parts.month}.`;
+  return local(`${WEEKDAYS_SR[WEEKDAY_INDEX[parts.weekday]]}, ${parts.day}.${parts.month}.`);
 }
 
 const dayKeyFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -221,7 +251,7 @@ export function formatRelativeDay(epochMs, nowMs = Date.now()) {
 }
 
 export function applyStaticTexts() {
-  document.documentElement.lang = currentLanguage === 'en' ? 'en' : 'sr-Latn';
+  document.documentElement.lang = HTML_LANG[currentLanguage];
   document.title = t('meta.title');
   document.querySelector('meta[name="description"]')?.setAttribute('content', t('meta.description'));
   for (const node of document.querySelectorAll('[data-i18n]')) {

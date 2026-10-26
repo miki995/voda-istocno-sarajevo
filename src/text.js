@@ -1,5 +1,7 @@
+import { toLatin } from '../public/translit.js';
+
 export function fold(value) {
-  return String(value ?? '')
+  return toLatin(value)
     .toLowerCase()
     .replace(/đ/g, 'd')
     .normalize('NFD')

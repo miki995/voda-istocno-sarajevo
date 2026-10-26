@@ -51,14 +51,15 @@ async function topWatches(store) {
 export async function loadStats(store, now = Date.now(), days = 30) {
   const rows = await Promise.all(
     previousDays(now, days).map(async day => {
-      const [visitors, opens, app, sr, en] = await Promise.all([
+      const [visitors, opens, app, sr, srLatn, en] = await Promise.all([
         store.scard(visitorsKey(day)),
         store.get(opensKey(day)),
         store.get(appKey(day)),
         store.get(langKey(day, 'sr')),
+        store.get(langKey(day, 'sr-Latn')),
         store.get(langKey(day, 'en')),
       ]);
-      return { day, visitors, opens: opens ?? 0, appOpens: app ?? 0, sr: sr ?? 0, en: en ?? 0 };
+      return { day, visitors, opens: opens ?? 0, appOpens: app ?? 0, sr: sr ?? 0, srLatn: srLatn ?? 0, en: en ?? 0 };
     }),
   );
   return {

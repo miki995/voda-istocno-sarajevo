@@ -1,5 +1,7 @@
 import { initAnalytics, trackEvent } from './analytics.js';
-import { LANGUAGES, applyStaticTexts, formatDayLabel, formatRelativeDay, getLanguage, setLanguage, t } from './i18n.js';
+import { LANGUAGES, LANGUAGE_LABELS, applyStaticTexts, formatDayLabel, formatRelativeDay, getLanguage, local, setLanguage, t } from './i18n.js';
+import { buildIcs, downloadIcs } from './calendar.js';
+import { toLatin } from './translit.js';
 
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
@@ -52,7 +54,7 @@ const nodes = {
 };
 
 function fold(value) {
-  return String(value ?? '')
+  return toLatin(value)
     .toLowerCase()
     .replace(/đ/g, 'd')
     .normalize('NFD')
@@ -106,7 +108,7 @@ function watchKey(watch) {
 }
 
 function watchLabel(watch) {
-  return watch.kind === 'ZONE' ? t('zone', { zone: watch.value }) : watch.value;
+  return watch.kind === 'ZONE' ? t('zone', { zone: watch.value }) : local(watch.value);
 }
 
 function hasWatch(kind, value) {
@@ -191,13 +193,42 @@ function statusFor(upcoming) {
   return { tone: 'ok', title: t('status.none'), detail: t('status.noneDetail') };
 }
 
-function scheduleItem(closure, showZone) {
+function linkButton(text, onClick) {
+  return el('button', { text, className: 'link-btn', attrs: { type: 'button' }, onClick });
+}
+
+function addToCalendar(closure, name) {
+  const summary = t('cal.title', { name });
+  const description = `${t('cal.description')} ${t('zone', { zone: closure.zone })}.`;
+  downloadIcs(buildIcs(closure, { summary, description, reminder: summary }));
+  trackEvent('add_to_calendar');
+}
+
+async function shareText(text, button) {
+  const url = location.origin;
+  trackEvent('share');
+  if (navigator.share) {
+    await navigator.share({ title: t('app.title'), text, url }).catch(() => undefined);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+  } catch {
+    return;
+  }
+  const label = button.textContent;
+  button.textContent = t('share.copied');
+  setTimeout(() => { button.textContent = label; }, 1800);
+}
+
+function scheduleItem(closure, showZone, watch) {
   const live = closure.start <= Date.now();
   return el('li', {}, [
     el('strong', { text: formatRelativeDay(closure.start) }),
     el('span', { text: ` · ${formatWindow(closure)}` }),
     ...(showZone ? [el('span', { text: ` · ${t('zone', { zone: closure.zone })}` })] : []),
     ...(live ? [el('span', { text: t('plan.live'), className: 'badge live' })] : []),
+    ...(live ? [] : [linkButton(t('card.calendar'), () => addToCalendar(closure, watchLabel(watch)))]),
   ]);
 }
 
@@ -210,10 +241,19 @@ function homeCard(watch) {
     el('p', { text: status.title, className: 'home-card-title' }),
     el('p', { text: status.detail, className: 'home-card-detail' }),
   ]);
+  const nextClosure = upcoming.find(closure => closure.start > Date.now());
+  card.append(
+    el('div', { className: 'card-actions' }, [
+      ...(nextClosure ? [linkButton(t('card.calendar'), () => addToCalendar(nextClosure, watchLabel(watch)))] : []),
+      linkButton(t('card.share'), event =>
+        shareText(t('share.cardText', { name: watchLabel(watch), title: status.title, detail: status.detail }), event.currentTarget),
+      ),
+    ]),
+  );
   if (upcoming.length > 1) {
     const details = el('details', { className: 'all-times', attrs: { 'data-key': key } }, [
       el('summary', { text: t('home.allTimes', { count: upcoming.length }) }),
-      el('ul', {}, upcoming.map(closure => scheduleItem(closure, watch.kind !== 'ZONE'))),
+      el('ul', {}, upcoming.map(closure => scheduleItem(closure, watch.kind !== 'ZONE', watch))),
     ]);
     details.open = state.openDetails.has(key);
     details.addEventListener('toggle', () => {
@@ -226,7 +266,7 @@ function homeCard(watch) {
 }
 
 function noticeBody(notice) {
-  return el('div', { className: 'notice-body' }, notice.lines.map(line => el('p', { text: line })));
+  return el('div', { className: 'notice-body' }, notice.lines.map(line => el('p', { text: local(line) })));
 }
 
 const KIND_TONE = { breakdown: 'bad', closure: 'bad', shutdown: 'bad', shortage: 'warn' };
@@ -237,7 +277,7 @@ function noticeKind(notice) {
 
 function noticeSummary(notice) {
   const text = notice.text.replace(/^obavje[sš]tavamo (potro[sš]a[cč]e )?/i, '');
-  return text.length > 110 ? `${text.slice(0, 110).trim()}…` : text;
+  return local(text.length > 110 ? `${text.slice(0, 110).trim()}…` : text);
 }
 
 function noticeCard(notice) {
@@ -257,7 +297,7 @@ function noticeCard(notice) {
   const kind = noticeKind(notice);
   return el('article', { className: `home-card notice-card tone-${KIND_TONE[kind]}` }, [
     el('p', { text: `${t(`kind.${kind}`)} · ${t('notices.mine')} · ${formatRelativeDay(noticeEpoch(notice))}`, className: 'home-card-name' }),
-    el('p', { text: notice.title, className: 'home-card-title' }),
+    el('p', { text: local(notice.title), className: 'home-card-title' }),
     el('p', { text: noticeSummary(notice), className: 'home-card-detail' }),
     details,
   ]);
@@ -349,9 +389,9 @@ function renderLanguageSwitch() {
   nodes.languageSwitch.replaceChildren(
     ...LANGUAGES.map(lang =>
       el('button', {
-        text: lang.toUpperCase(),
+        text: LANGUAGE_LABELS[lang],
         className: 'lang-btn',
-        attrs: { type: 'button', 'aria-pressed': String(getLanguage() === lang), lang },
+        attrs: { type: 'button', 'aria-pressed': String(getLanguage() === lang), lang: lang === 'sr' ? 'sr-Cyrl' : lang },
         onClick: () => changeLanguage(lang),
       }),
     ),
@@ -403,7 +443,7 @@ function renderNotices() {
       if (mine) badges.push(el('span', { text: t('notices.mine'), className: 'badge mine' }));
       return el('article', { className: `notice${mine ? ' mine' : ''}` }, [
         el('div', { className: 'closure-head' }, [
-          el('strong', { text: notice.title }),
+          el('strong', { text: local(notice.title) }),
           el('span', { className: 'row' }, badges),
         ]),
         el('p', { text: dayHeading(noticeEpoch(notice)), className: 'muted' }),
@@ -434,7 +474,7 @@ function renderClosures() {
           el('span', { className: 'row' }, badges),
         ]),
         el('p', { text: dayHeading(closure.start), className: 'muted' }),
-        el('ul', {}, closure.lines.map(line => el('li', { text: line }))),
+        el('ul', {}, closure.lines.map(line => el('li', { text: local(line) }))),
       ]);
     }),
   );
@@ -455,7 +495,7 @@ function renderZones() {
           { className: 'place-list' },
           places.map(place =>
             el('button', {
-              text: place,
+              text: local(place),
               className: 'place',
               attrs: { type: 'button', 'aria-pressed': String(hasWatch('PLACE', place)) },
               onClick: () => toggleWatch('PLACE', place),
@@ -475,10 +515,11 @@ function renderUpdated() {
     return;
   }
   if (!state.plan.fetchedAt) {
-    nodes.updated.textContent = t('header.loading');
+    nodes.updated.textContent = navigator.onLine ? t('header.loading') : t('plan.loadFailed');
     return;
   }
-  nodes.updated.textContent = t('plan.updated', { time: timeFormat.format(state.plan.fetchedAt) });
+  const key = navigator.onLine ? 'plan.updated' : 'plan.offline';
+  nodes.updated.textContent = t(key, { time: timeFormat.format(state.plan.fetchedAt) });
 }
 
 function renderAll() {
@@ -513,21 +554,29 @@ function allSuggestions(query) {
 
 let activeSuggestion = -1;
 
+function setSuggestionsOpen(open) {
+  nodes.suggestions.hidden = !open;
+  nodes.searchInput.setAttribute('aria-expanded', String(open));
+  nodes.searchInput.removeAttribute('aria-activedescendant');
+}
+let suggestionValues = [];
+
 function renderSuggestions() {
   const query = nodes.searchInput.value;
   const items = allSuggestions(query);
   const typed = query.trim();
   const showTyped = fold(typed).length >= 3 && !items.some(item => fold(item.place) === fold(typed));
   const rows = items.map(item => ({ value: item.place, tag: t('zone', { zone: item.zone }) }));
-  if (showTyped) rows.push({ value: typed, tag: t('watch.addTyped') });
+  if (showTyped) rows.push({ value: toLatin(typed), tag: t('watch.addTyped') });
+  suggestionValues = rows.map(row => row.value);
   activeSuggestion = -1;
-  nodes.suggestions.hidden = rows.length === 0;
+  setSuggestionsOpen(rows.length > 0);
   nodes.suggestions.replaceChildren(
-    ...rows.map(row =>
+    ...rows.map((row, index) =>
       el(
         'li',
-        { attrs: { role: 'option', 'aria-selected': 'false' } },
-        [el('span', { text: row.value }), el('span', { text: row.tag, className: 'tag' })],
+        { attrs: { id: `suggestion-${index}`, role: 'option', 'aria-selected': 'false' } },
+        [el('span', { text: local(row.value) }), el('span', { text: row.tag, className: 'tag' })],
       ),
     ),
   );
@@ -542,7 +591,7 @@ function renderSuggestions() {
 function pickSuggestion(value) {
   if (!hasWatch('PLACE', value)) toggleWatch('PLACE', value);
   nodes.searchInput.value = '';
-  nodes.suggestions.hidden = true;
+  setSuggestionsOpen(false);
 }
 
 function moveSuggestion(step) {
@@ -550,18 +599,18 @@ function moveSuggestion(step) {
   if (options.length === 0) return;
   activeSuggestion = (activeSuggestion + step + options.length) % options.length;
   options.forEach((option, index) => option.setAttribute('aria-selected', String(index === activeSuggestion)));
+  nodes.searchInput.setAttribute('aria-activedescendant', `suggestion-${activeSuggestion}`);
 }
 
 nodes.searchInput.addEventListener('input', renderSuggestions);
-nodes.searchInput.addEventListener('blur', () => { nodes.suggestions.hidden = true; });
+nodes.searchInput.addEventListener('blur', () => setSuggestionsOpen(false));
 nodes.searchInput.addEventListener('keydown', event => {
   if (event.key === 'ArrowDown') { event.preventDefault(); moveSuggestion(1); }
   if (event.key === 'ArrowUp') { event.preventDefault(); moveSuggestion(-1); }
   if (event.key === 'Enter') {
     event.preventDefault();
-    const options = [...nodes.suggestions.children];
-    const chosen = options[Math.max(activeSuggestion, 0)];
-    if (chosen) pickSuggestion(chosen.firstChild.textContent);
+    const chosen = suggestionValues[Math.max(activeSuggestion, 0)];
+    if (chosen) pickSuggestion(chosen);
   }
 });
 
@@ -697,11 +746,16 @@ function screenFromHash() {
   return SCREENS.includes(name) ? name : 'home';
 }
 
-function showScreen(name) {
+function showScreen(name, moveFocus = true) {
   for (const section of nodes.screens) {
     section.hidden = section.dataset.screen !== name;
   }
   window.scrollTo(0, 0);
+  const heading = document.querySelector(`[data-screen="${name}"] h1, [data-screen="${name}"] h2`);
+  if (moveFocus && heading) {
+    heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }
 }
 
 function navigate(name) {
@@ -724,6 +778,14 @@ window.addEventListener('popstate', () => showScreen(screenFromHash()));
 
 nodes.menuButton.addEventListener('click', () => navigate('menu'));
 nodes.addDone.addEventListener('click', () => navigate('home'));
+document.getElementById('menu-share').addEventListener('click', event =>
+  shareText(t('share.appText'), event.currentTarget.querySelector('.menu-label')),
+);
+window.addEventListener('offline', renderUpdated);
+window.addEventListener('online', () => {
+  renderUpdated();
+  loadDataQuietly();
+});
 document.querySelectorAll('[data-nav]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.nav)));
 document.querySelectorAll('[data-nav-back]').forEach(button => button.addEventListener('click', goBack));
 
@@ -778,14 +840,14 @@ function trackVisit() {
 
 async function init() {
   history.replaceState({ screen: screenFromHash(), depth: 0 }, '', location.href);
-  showScreen(screenFromHash());
+  showScreen(screenFromHash(), false);
   applyStaticTexts();
   renderAll();
   initAnalytics();
   trackVisit();
   await loadDataQuietly();
-  if (pushSupported() && !isIosBrowserTab()) {
-    const registration = await navigator.serviceWorker.register('/sw.js');
+  const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.register('/sw.js').catch(() => null) : null;
+  if (registration && pushSupported() && !isIosBrowserTab()) {
     state.subscription = await registration.pushManager.getSubscription();
     renderAll();
     syncSubscription();
