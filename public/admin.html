@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="sr-Latn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Voda · stanje aplikacije</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 20px 16px 48px; }
+    main { max-width: 900px; margin: 0 auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { padding: 6px 8px; text-align: right; border-bottom: 0.5px solid var(--hairline); }
+    th:first-child, td:first-child { text-align: left; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+    .card { background: var(--surface); border-radius: 16px; padding: 14px 16px; }
+    .card strong { display: block; font-size: 1.4rem; }
+    .bad { color: var(--red); }
+    .ok { color: var(--green); }
+    form { display: flex; gap: 8px; margin: 16px 0; }
+    input { flex: 1; font: inherit; padding: 10px 12px; border-radius: 10px; border: 0.5px solid var(--hairline); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Stanje aplikacije</h1>
+    <form id="login">
+      <input id="token" type="password" autocomplete="off" placeholder="CRON_SECRET">
+      <button class="btn primary" type="submit">Prikaži</button>
+    </form>
+    <p id="message" class="muted"></p>
+    <div id="summary" class="grid"></div>
+    <div id="table"></div>
+    <h2>Najčešće praćeno</h2>
+    <ul id="top"></ul>
+  </main>
+  <script src="/admin.js" type="module"></script>
+</body>
+</html>

@@ -7,6 +7,8 @@ export const LEAD_MS = 2 * 60 * 60 * 1000;
 export const RESTORED_WINDOW_MS = 2 * 60 * 60 * 1000;
 const CONTINUATION_GAP_MS = 15 * 60 * 1000;
 export const MORNING_HOUR = 7;
+export const EVENING_HOUR = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const KIND_PRIORITY = ['SOON', 'MORNING', 'PUBLISHED'];
 
@@ -86,6 +88,32 @@ function restoredNotification(closure, closures, watches, sent, now, lang) {
   };
 }
 
+function isEveningBefore(closure, now) {
+  return localParts(now).hour >= EVENING_HOUR && dayKey(closure.start) === dayKey(now + DAY_MS);
+}
+
+// One message after 20:00 listing everything that is closed tomorrow, so nobody has to remember three separate alerts.
+export function eveningNotifications({ closures, watches, sent, now, lang = DEFAULT_LANGUAGE, skipIds = [] }) {
+  const lines = [];
+  const markSent = [];
+  for (const closure of closures) {
+    if (!isEveningBefore(closure, now) || skipIds.includes(closure.id) || sent.includes(`${closure.id}|EVENING`)) {
+      continue;
+    }
+    const labels = matchedWatches(closure, watches, lang);
+    if (labels.length === 0) {
+      continue;
+    }
+    const messages = messagesFor(lang);
+    lines.push(`${formatTime(closure.start)}–${formatEndTime(closure.start, closure.end)} (${messages.zone(closure.zone)}) – ${labels.join(', ')}`);
+    markSent.push(`${closure.id}|EVENING`);
+  }
+  if (lines.length === 0) {
+    return [];
+  }
+  return [{ tag: `evening-${dayKey(now)}`, markSent, ...localized({ title: messagesFor(lang).tomorrow, body: lines.join('\n') }, lang) }];
+}
+
 export function planNotifications({ closures, watches, sent, now, lang = DEFAULT_LANGUAGE }) {
   const notifications = [];
   for (const closure of closures) {
@@ -102,10 +130,14 @@ export function planNotifications({ closures, watches, sent, now, lang = DEFAULT
       continue;
     }
     const kind = KIND_PRIORITY.find(candidate => kinds.includes(candidate));
+    const markSent = kinds.map(dueKind => `${closure.id}|${dueKind}`);
+    if (isEveningBefore(closure, now)) {
+      markSent.push(`${closure.id}|EVENING`);
+    }
     notifications.push({
       closureId: closure.id,
       tag: `${closure.id}-${kind}`,
-      markSent: kinds.map(dueKind => `${closure.id}|${dueKind}`),
+      markSent,
       ...localized(buildMessage(kind, closure, labels, now, lang), lang),
     });
   }

@@ -1,12 +1,17 @@
 import { initAnalytics, trackEvent } from './analytics.js';
 import { LANGUAGES, LANGUAGE_LABELS, applyStaticTexts, formatDayLabel, formatRelativeDay, getLanguage, local, setLanguage, t } from './i18n.js';
 import { buildIcs, downloadIcs } from './calendar.js';
+import { createZoneMap, getPosition, nearestPlaces, ZONE_COLORS } from './map.js';
 import { toLatin } from './translit.js';
 
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
-const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'zones'];
+const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'zones', 'map'];
+const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
+const TEXT_KEY = 'voda-text';
+const STALE_SOURCE_MS = 3 * 60 * 60 * 1000;
+const LOCATE_RADIUS_M = 1500;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOME_NOTICE_DAYS = 3;
 const VISITOR_KEY = 'voda-visitor';
@@ -15,6 +20,7 @@ const SESSION_KEY = 'voda-session-counted';
 const timeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
 const ICONS = {
+  warn: '<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   drop: '<path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.4 0z"/>',
   bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
 };
@@ -27,6 +33,10 @@ const state = {
   alertsMessage: '',
   planLoadFailed: false,
   openDetails: new Set(),
+  history: [],
+  placeCoords: [],
+  zoneMap: null,
+  textSize: loadTextSize(),
 };
 
 const nodes = {
@@ -50,6 +60,14 @@ const nodes = {
   watchEmpty: document.getElementById('watch-empty'),
   addDone: document.getElementById('add-done'),
   closures: document.getElementById('closures'),
+  textSizeSwitch: document.getElementById('text-size-switch'),
+  locateButton: document.getElementById('locate-button'),
+  locateMessage: document.getElementById('locate-message'),
+  locateResults: document.getElementById('locate-results'),
+  zoneMapBox: document.getElementById('zone-map'),
+  mapLegend: document.getElementById('map-legend'),
+  mapMessage: document.getElementById('map-message'),
+  mapLocate: document.getElementById('map-locate'),
   zones: document.getElementById('zones'),
 };
 
@@ -63,6 +81,39 @@ function fold(value) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function loadTextSize() {
+  try {
+    const stored = localStorage.getItem(TEXT_KEY);
+    return stored in TEXT_SIZES ? stored : 'normal';
+  } catch {
+    return 'normal';
+  }
+}
+
+function setTextSize(size) {
+  state.textSize = size;
+  document.documentElement.dataset.text = size;
+  try {
+    localStorage.setItem(TEXT_KEY, size);
+  } catch {
+    return;
+  }
+  renderTextSizeSwitch();
+}
+
+function renderTextSizeSwitch() {
+  nodes.textSizeSwitch.replaceChildren(
+    ...Object.entries(TEXT_SIZES).map(([size, label]) =>
+      el('button', {
+        text: label,
+        className: 'lang-btn',
+        attrs: { type: 'button', 'aria-pressed': String(state.textSize === size), 'aria-label': t(`text.${size}`) },
+        onClick: () => setTextSize(size),
+      }),
+    ),
+  );
 }
 
 function loadWatches() {
@@ -232,6 +283,31 @@ function scheduleItem(closure, showZone, watch) {
   ]);
 }
 
+function pastSummary(watch) {
+  const now = Date.now();
+  const hits = state.history.filter(closure => closure.end <= now && closure.end >= now - 30 * DAY_MS && watchMatchesClosure(watch, closure));
+  if (hits.length === 0) return '';
+  const hours = Math.round(hits.reduce((total, closure) => total + (closure.end - closure.start), 0) / (60 * 60 * 1000));
+  return t('stats.last30', { count: hits.length, hours });
+}
+
+function sourceNotice() {
+  const stale = state.plan.fetchedAt > 0 && Date.now() - state.plan.fetchedAt > STALE_SOURCE_MS && navigator.onLine;
+  if (!stale) return [];
+  return [
+    el('div', { className: 'banner' }, [
+      iconTile('warn', 'red'),
+      el('div', { className: 'banner-text' }, [
+        el('p', { text: t('source.stale', { time: timeFormat.format(state.plan.fetchedAt) }) }),
+        el('div', { className: 'card-actions' }, [
+          el('a', { text: t('source.facebook'), className: 'link-btn', attrs: { href: 'https://www.facebook.com/vodovodistocnosarajevo/', rel: 'noopener' } }),
+          el('a', { text: t('source.call'), className: 'link-btn', attrs: { href: 'tel:+38757342742' } }),
+        ]),
+      ]),
+    ]),
+  ];
+}
+
 function homeCard(watch) {
   const upcoming = upcomingClosuresFor(watch);
   const status = statusFor(upcoming);
@@ -241,6 +317,10 @@ function homeCard(watch) {
     el('p', { text: status.title, className: 'home-card-title' }),
     el('p', { text: status.detail, className: 'home-card-detail' }),
   ]);
+  const past = pastSummary(watch);
+  if (past) {
+    card.append(el('p', { text: past, className: 'home-card-detail muted' }));
+  }
   const nextClosure = upcoming.find(closure => closure.start > Date.now());
   card.append(
     el('div', { className: 'card-actions' }, [
@@ -334,6 +414,7 @@ function renderHome() {
   renderBanner();
   if (state.watches.length === 0) {
     nodes.homeContent.replaceChildren(
+      ...sourceNotice(),
       ...noticeCards(),
       el('div', { className: 'empty-state' }, [
         iconTile('drop', 'blue'),
@@ -345,6 +426,7 @@ function renderHome() {
     return;
   }
   nodes.homeContent.replaceChildren(
+    ...sourceNotice(),
     ...noticeCards(),
     ...state.watches.map(homeCard),
     el('button', { text: t('home.addMore'), className: 'btn wide', attrs: { type: 'button' }, onClick: () => navigate('add') }),
@@ -524,6 +606,9 @@ function renderUpdated() {
 
 function renderAll() {
   renderLanguageSwitch();
+  renderTextSizeSwitch();
+  renderLegend();
+  state.zoneMap?.refresh();
   renderUpdated();
   renderHome();
   renderMenuValues();
@@ -613,6 +698,97 @@ nodes.searchInput.addEventListener('keydown', event => {
     if (chosen) pickSuggestion(chosen);
   }
 });
+
+function formatDistance(meters) {
+  return meters < 1000 ? t('distance.m', { value: Math.max(10, Math.round(meters / 10) * 10) }) : t('distance.km', { value: (meters / 1000).toFixed(1) });
+}
+
+function renderLegend() {
+  nodes.mapLegend.replaceChildren(
+    ...ZONE_NAMES.map(zone => {
+      const dot = el('i');
+      dot.style.background = ZONE_COLORS[zone];
+      return el('span', {}, [dot, el('span', { text: t('zone', { zone }) })]);
+    }),
+  );
+}
+
+function showLocateResults(position) {
+  const nearby = nearestPlaces(state.placeCoords, position, 3);
+  const close = nearby.filter(place => place.distance <= LOCATE_RADIUS_M);
+  const shown = close.length > 0 ? close : nearby.slice(0, 1);
+  nodes.locateMessage.textContent = shown.length === 0 ? t('locate.unavailable') : close.length > 0 ? t('locate.found') : t('locate.far');
+  nodes.locateResults.replaceChildren(
+    ...shown.map(place =>
+      el('button', {
+        text: `${local(place.place)} · ${t('zone', { zone: place.zone })} · ${formatDistance(place.distance)}`,
+        className: 'place',
+        attrs: { type: 'button', 'aria-pressed': String(hasWatch('PLACE', place.place)) },
+        onClick: () => {
+          if (!hasWatch('PLACE', place.place)) toggleWatch('PLACE', place.place);
+          showLocateResults(position);
+        },
+      }),
+    ),
+  );
+}
+
+function locationErrorKey(error) {
+  return error?.code === 1 ? 'locate.denied' : 'locate.unavailable';
+}
+
+async function locateMe() {
+  nodes.locateButton.disabled = true;
+  nodes.locateResults.replaceChildren();
+  nodes.locateMessage.textContent = t('locate.working');
+  try {
+    showLocateResults(await getPosition());
+    trackEvent('locate_street');
+  } catch (error) {
+    nodes.locateMessage.textContent = t(locationErrorKey(error));
+  } finally {
+    nodes.locateButton.disabled = false;
+  }
+}
+
+async function openMap() {
+  nodes.mapMessage.textContent = '';
+  try {
+    if (!state.zoneMap) {
+      const places = state.placeCoords;
+      const created = await createZoneMap(nodes.zoneMapBox, places, {
+        isWatched: place => hasWatch('PLACE', place),
+        onToggle: place => toggleWatch('PLACE', place),
+        text: { name: local, zone: zone => t('zone', { zone }), add: t('map.add'), remove: t('map.remove') },
+      });
+      if (places !== state.placeCoords) {
+        created.destroy();
+        return openMap();
+      }
+      state.zoneMap = created;
+    }
+    state.zoneMap.refresh();
+  } catch {
+    nodes.mapMessage.textContent = t('map.needsInternet');
+  }
+}
+
+async function locateOnMap() {
+  nodes.mapLocate.disabled = true;
+  nodes.mapMessage.textContent = '';
+  try {
+    const position = await getPosition();
+    await openMap();
+    state.zoneMap?.showPosition(position);
+  } catch (error) {
+    nodes.mapMessage.textContent = t(locationErrorKey(error));
+  } finally {
+    nodes.mapLocate.disabled = false;
+  }
+}
+
+nodes.locateButton.addEventListener('click', locateMe);
+nodes.mapLocate.addEventListener('click', locateOnMap);
 
 function isIosBrowserTab() {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -756,6 +932,7 @@ function showScreen(name, moveFocus = true) {
     heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
   }
+  if (name === 'map') openMap();
 }
 
 function navigate(name) {
@@ -790,12 +967,22 @@ document.querySelectorAll('[data-nav]').forEach(button => button.addEventListene
 document.querySelectorAll('[data-nav-back]').forEach(button => button.addEventListener('click', goBack));
 
 async function loadData() {
-  const [plan, zonePlaces] = await Promise.all([
+  const [plan, zonePlaces, history, placeCoords] = await Promise.all([
     fetch('/api/plan').then(response => response.json()),
     fetch('/api/zones').then(response => response.json()),
+    fetch('/api/history').then(response => response.json()).catch(() => state.history),
+    fetch('/places.json').then(response => response.json()).catch(() => state.placeCoords),
   ]);
   state.plan = plan;
   state.zonePlaces = zonePlaces;
+  state.history = Array.isArray(history) ? history : [];
+  const previousPlaces = state.placeCoords.length;
+  state.placeCoords = Array.isArray(placeCoords) ? placeCoords : [];
+  if (state.zoneMap && state.placeCoords.length !== previousPlaces) {
+    state.zoneMap.destroy();
+    state.zoneMap = null;
+    if (screenFromHash() === 'map') openMap();
+  }
   state.planLoadFailed = false;
   renderAll();
 }
@@ -840,6 +1027,7 @@ function trackVisit() {
 
 async function init() {
   history.replaceState({ screen: screenFromHash(), depth: 0 }, '', location.href);
+  document.documentElement.dataset.text = state.textSize;
   showScreen(screenFromHash(), false);
   applyStaticTexts();
   renderAll();

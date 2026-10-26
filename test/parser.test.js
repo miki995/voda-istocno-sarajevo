@@ -357,7 +357,7 @@ describe('usage statistics', () => {
     await recordHit(store, { visitor: 'visitor-one', lang: 'sr', standalone: false }, now);
     await recordHit(store, { visitor: 'visitor-two', lang: 'en', standalone: false }, now);
     const stats = await loadStats(store, now, 2);
-    assert.deepEqual(stats.days[0], { day: '2026-10-23', visitors: 2, opens: 3, appOpens: 1, sr: 2, srLatn: 0, en: 1 });
+    assert.deepEqual(stats.days[0], { day: '2026-10-23', visitors: 2, opens: 3, appOpens: 1, sr: 2, srLatn: 0, en: 1, pushOk: 0, pushFailed: 0, pushGone: 0 });
     assert.equal(stats.days[1].visitors, 0);
   });
 });

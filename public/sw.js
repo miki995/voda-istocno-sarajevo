@@ -1,6 +1,6 @@
-const CACHE = 'voda-v1';
-const SHELL = ['/', '/app.js', '/i18n.js', '/translit.js', '/calendar.js', '/analytics.js', '/styles.css', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
-const CACHED_API = ['/api/plan', '/api/zones'];
+const CACHE = 'voda-v2';
+const SHELL = ['/', '/app.js', '/i18n.js', '/translit.js', '/calendar.js', '/analytics.js', '/map.js', '/places.json', '/styles.css', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
+const CACHED_API = ['/api/plan', '/api/zones', '/api/history'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -20,19 +20,20 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
   const cacheable = SHELL.includes(url.pathname) || CACHED_API.includes(url.pathname);
-  if (request.method !== 'GET' || url.origin !== self.location.origin || !(cacheable || request.mode === 'navigate')) {
+  if (request.method !== 'GET' || url.origin !== self.location.origin || !cacheable) {
     return;
   }
+  const key = new Request(url.origin + url.pathname);
   event.respondWith(
     fetch(request)
       .then(response => {
         if (response.ok) {
           const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(request.mode === 'navigate' ? '/' : request, copy));
+          caches.open(CACHE).then(cache => cache.put(key, copy));
         }
         return response;
       })
-      .catch(async () => (await caches.match(request.mode === 'navigate' ? '/' : request)) ?? Response.error()),
+      .catch(async () => (await caches.match(key)) ?? Response.error()),
   );
 });
 

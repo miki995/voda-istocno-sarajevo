@@ -58,5 +58,6 @@ createServer(async (req, res) => {
     return res.end('Not found');
   }
   res.setHeader('content-type', CONTENT_TYPES[extname(target)] ?? 'application/octet-stream');
+  res.setHeader('cache-control', 'no-store');
   return res.end(readFileSync(target));
 }).listen(port, '127.0.0.1', () => console.log(`http://127.0.0.1:${port}`));

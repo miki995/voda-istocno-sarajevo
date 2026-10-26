@@ -1,0 +1,248 @@
+[
+ {
+  "place": "Akademika Boriše Starovića",
+  "zone": "I",
+  "lat": 43.81697,
+  "lon": 18.36358
+ },
+ {
+  "place": "Akademika Petra Mandića",
+  "zone": "III",
+  "lat": 43.82435,
+  "lon": 18.35579
+ },
+ {
+  "place": "Banović Strahinje",
+  "zone": "III",
+  "lat": 43.82168,
+  "lon": 18.35499
+ },
+ {
+  "place": "Beogradska",
+  "zone": "III",
+  "lat": 43.83686,
+  "lon": 18.38965
+ },
+ {
+  "place": "Cara Dušana",
+  "zone": "II",
+  "lat": 43.82422,
+  "lon": 18.37304
+ },
+ {
+  "place": "Cara Lazara",
+  "zone": "II",
+  "lat": 43.82188,
+  "lon": 18.36851
+ },
+ {
+  "place": "Dabrobosanska",
+  "zone": "III",
+  "lat": 43.82419,
+  "lon": 18.35834
+ },
+ {
+  "place": "Dečanske",
+  "zone": "I"
+ },
+ {
+  "place": "Dobrinja I",
+  "zone": "III",
+  "lat": 43.82331,
+  "lon": 18.3563
+ },
+ {
+  "place": "Dobrinja IV",
+  "zone": "III",
+  "lat": 43.82803,
+  "lon": 18.35831
+ },
+ {
+  "place": "Donje Mladice",
+  "zone": "I",
+  "lat": 43.80986,
+  "lon": 18.3633
+ },
+ {
+  "place": "Donji Kotorac",
+  "zone": "I",
+  "lat": 43.80804,
+  "lon": 18.34401
+ },
+ {
+  "place": "Đure Jakšića",
+  "zone": "II",
+  "lat": 43.81898,
+  "lon": 18.37575
+ },
+ {
+  "place": "Famosovo naselje",
+  "zone": "I"
+ },
+ {
+  "place": "Gornje Mladice",
+  "zone": "I",
+  "lat": 43.79005,
+  "lon": 18.37201
+ },
+ {
+  "place": "Hilandarske",
+  "zone": "I"
+ },
+ {
+  "place": "Ive Andrića",
+  "zone": "III",
+  "lat": 43.82973,
+  "lon": 18.35785
+ },
+ {
+  "place": "Jovana Raškovića",
+  "zone": "III",
+  "lat": 43.82924,
+  "lon": 18.37585
+ },
+ {
+  "place": "Karađorđeva",
+  "zone": "II",
+  "lat": 43.82458,
+  "lon": 18.36884
+ },
+ {
+  "place": "Kasindolskog bataljona",
+  "zone": "I",
+  "lat": 43.79794,
+  "lon": 18.39132
+ },
+ {
+  "place": "Krupac",
+  "zone": "II",
+  "lat": 43.76554,
+  "lon": 18.37022
+ },
+ {
+  "place": "Miroslava Krleže",
+  "zone": "III"
+ },
+ {
+  "place": "Mladičko polje",
+  "zone": "I",
+  "lat": 43.80759,
+  "lon": 18.37208
+ },
+ {
+  "place": "Nikole Tesle",
+  "zone": "II",
+  "lat": 43.82584,
+  "lon": 18.36979
+ },
+ {
+  "place": "Novakovići",
+  "zone": "I"
+ },
+ {
+  "place": "Ozrenske",
+  "zone": "III"
+ },
+ {
+  "place": "Radulovac",
+  "zone": "II"
+ },
+ {
+  "place": "Šetalište dr Miodraga Lazića",
+  "zone": "III",
+  "lat": 43.8243,
+  "lon": 18.35842
+ },
+ {
+  "place": "Sidnej",
+  "zone": "I",
+  "lat": 43.81951,
+  "lon": 18.36227
+ },
+ {
+  "place": "Sime Milutinovića Sarajlije",
+  "zone": "I",
+  "lat": 43.81691,
+  "lon": 18.36665
+ },
+ {
+  "place": "Spasovdanske",
+  "zone": "I"
+ },
+ {
+  "place": "Srpskih ratnika",
+  "zone": "III",
+  "lat": 43.84022,
+  "lon": 18.39353
+ },
+ {
+  "place": "Srpskih vladara",
+  "zone": "III",
+  "lat": 43.82362,
+  "lon": 18.35661
+ },
+ {
+  "place": "Starosjedilaca",
+  "zone": "III",
+  "lat": 43.83083,
+  "lon": 18.36543
+ },
+ {
+  "place": "TC TOM",
+  "zone": "I"
+ },
+ {
+  "place": "Tešanovo brdo",
+  "zone": "III",
+  "lat": 43.83118,
+  "lon": 18.37947
+ },
+ {
+  "place": "Toplik",
+  "zone": "II",
+  "lat": 43.8094,
+  "lon": 18.39524
+ },
+ {
+  "place": "Trg kralja Aleksandra",
+  "zone": "III",
+  "lat": 43.82097,
+  "lon": 18.35428
+ },
+ {
+  "place": "Trg Miroslava Berjana",
+  "zone": "I",
+  "lat": 43.81458,
+  "lon": 18.36816
+ },
+ {
+  "place": "Trg Sabora Bosanskog",
+  "zone": "III",
+  "lat": 43.82323,
+  "lon": 18.35538
+ },
+ {
+  "place": "Vojkovići",
+  "zone": "II",
+  "lat": 43.79943,
+  "lon": 18.34723
+ },
+ {
+  "place": "Vojvode Radomira Putnika",
+  "zone": "III",
+  "lat": 43.81705,
+  "lon": 18.35599
+ },
+ {
+  "place": "Vraca",
+  "zone": "III",
+  "lat": 43.84349,
+  "lon": 18.39784
+ },
+ {
+  "place": "Zmaj Jovina",
+  "zone": "I",
+  "lat": 43.82079,
+  "lon": 18.36027
+ }
+]

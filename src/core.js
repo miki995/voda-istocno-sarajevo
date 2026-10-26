@@ -4,9 +4,11 @@ import { extrasToNotices, parseNotice } from './notices.js';
 import { mergePlacesByZone, parsePlan } from './parser.js';
 import { dayKey } from './time.js';
 import { normalizeLanguage } from './messages.js';
-import { noticeNotifications, planNotifications, pruneSent } from './notify.js';
+import { eveningNotifications, noticeNotifications, planNotifications, pruneSent } from './notify.js';
 import { fold } from './text.js';
 import { checkHealth } from './health.js';
+import { recordHistory } from './history.js';
+import { recordCron, recordPush } from './stats.js';
 import zonesSeed from './zones-seed.json' with { type: 'json' };
 
 const SOURCE_URL = 'https://vikis.info/';
@@ -154,6 +156,7 @@ export async function refreshPlan(store, now) {
   const closuresChanged = JSON.stringify(previous.closures) !== JSON.stringify(closures);
   const noticesChanged = JSON.stringify(previous.notices) !== JSON.stringify(notices);
   const plan = { fetchedAt: now, status: parsed.status, closures, notices };
+  await recordHistory(store, closures, now).catch(error => console.error('history not saved', error.message));
   const problem = findProblem(homeHtml, parsed);
 
   if (closuresChanged || noticesChanged || now - previous.fetchedAt > HOUR_MS) {
@@ -180,8 +183,18 @@ async function notifySubscriber(store, env, plan, now, id) {
     await store.srem(SUBS_SET, id);
     return 0;
   }
+  const planned = planNotifications({ closures: plan.closures, watches: record.watches, sent: record.sent, now, lang: record.lang });
+  const evening = eveningNotifications({
+    closures: plan.closures,
+    watches: record.watches,
+    sent: record.sent,
+    now,
+    lang: record.lang,
+    skipIds: planned.map(notification => notification.closureId),
+  });
   const notifications = [
-    ...planNotifications({ closures: plan.closures, watches: record.watches, sent: record.sent, now, lang: record.lang }),
+    ...planned,
+    ...evening,
     ...noticeNotifications({ notices: plan.notices, watches: record.watches, sent: record.sent, now, lang: record.lang }),
   ];
   let delivered = 0;
@@ -193,6 +206,7 @@ async function notifySubscriber(store, env, plan, now, id) {
       lang: normalizeLanguage(record.lang),
     }).catch(() => null);
     if (response?.status === 404 || response?.status === 410) {
+      await recordPush(store, 'gone', now);
       await store.del(subKey(id));
       await store.srem(SUBS_SET, id);
       return delivered;
@@ -200,6 +214,9 @@ async function notifySubscriber(store, env, plan, now, id) {
     if (response?.ok) {
       record.sent.push(...notification.markSent);
       delivered += 1;
+      await recordPush(store, 'ok', now);
+    } else {
+      await recordPush(store, 'failed', now);
     }
   }
   const prunedSent = pruneSent(record.sent, [...plan.closures, ...plan.notices]);
@@ -228,6 +245,7 @@ export async function runCron(store, env, now = Date.now()) {
   }
   const delivered = await dispatchNotifications(store, env, plan, now);
   const health = await checkHealth(store, env, problem, now).catch(error => `health check failed: ${error.message}`);
+  await recordCron(store, { at: now, closures: plan.closures.length, notices: plan.notices.length, delivered, problem: problem?.kind ?? null }).catch(() => undefined);
   return { closures: plan.closures.length, notices: plan.notices.length, delivered, planError, health };
 }
 

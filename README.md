@@ -15,6 +15,18 @@ The site is available in Serbian (default in Cyrillic, with a Latin option in th
 - Besides the plan, the site publishes notices (breakdowns, works, shutdown announcements, water shortages). They are read from the calendar (last 14 days and the next 7; the home page only highlights those from the last 3 days), sorted into `breakdown`, `shutdown`, `shortage` and `closure` (`src/notices.js`) and shown on the home page and in the menu. Text a plan page publishes before its first closure, and closure headers the parser cannot read, are kept as notices too instead of being dropped. A notice that mentions one of your streets triggers a push notification once.
 - The street list per zone grows with every plan the site sees. The initial list lives in `src/zones-seed.json`.
 
+## More features
+
+- **Evening summary:** after 20:00 one push lists everything closed tomorrow for your streets.
+- **Water is back:** a push when a closure ends (not when another one for the same street follows right away).
+- **History:** every closure seen is kept for 60 days (`/api/history`); the home card shows how often a street was without water in the last 30 days.
+- **Stale data notice:** if the plan was not refreshed for 3 hours the home page links to the utility's Facebook page and phone number (Facebook cannot be read automatically without a login).
+- **Zone map and "find my street":** `public/places.json` holds coordinates for the known streets (made with `node scripts/geocode-places.mjs [site-url]` from OpenStreetMap, rerun it when new streets appear). The map uses Leaflet and OpenStreetMap tiles. The phone position is compared with these points on the device and is never sent anywhere.
+- **Larger text:** three sizes in the menu, remembered on the device.
+- **Offline:** the service worker keeps the app and the last plan, so it opens without a connection.
+- **Status page:** `/admin.html` asks for `CRON_SECRET` and shows subscribers, last cron run, source problems and push delivery (ok / failed / removed devices).
+- **Source alerts by e-mail:** set `RESEND_API_KEY` (and optionally `ALERT_EMAIL`, `ALERT_FROM`). A mail is sent when vikis.info cannot be read or understood for 30 minutes, at most once a day.
+
 ## Usage statistics
 
 The app counts its own usage in Redis, with no cookies and no third-party service. Once per browser session it sends a random device id (kept in `localStorage`), the language and whether it was opened from the Home Screen to `/api/hit`. No IP address or user agent is stored. To read the numbers (30 days of unique visitors, opens, Home Screen opens, language split, number of subscribers and the ten most watched streets or zones):

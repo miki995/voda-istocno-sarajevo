@@ -9,6 +9,7 @@ const MESSAGES = {
     soon: minutes => `Voda nestaje za oko ${minutes} min`,
     morning: 'Danas nema vode',
     restored: 'Redukcija završena – voda se vraća',
+    tomorrow: 'Sutra nema vode',
     notice: {
       breakdown: where => `Vanredno obavještenje – ${where}`,
       shutdown: where => `Najava isključenja – ${where}`,
@@ -22,6 +23,7 @@ const MESSAGES = {
     soon: minutes => `Water cuts off in about ${minutes} min`,
     morning: 'No water today',
     restored: 'Outage over – water is coming back',
+    tomorrow: 'No water tomorrow',
     notice: {
       breakdown: where => `Water utility notice – ${where}`,
       shutdown: where => `Planned shutdown – ${where}`,
