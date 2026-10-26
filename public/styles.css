@@ -375,7 +375,7 @@ html[data-text='xlarge'] { font-size: 136%; }
 .wg-day small { display: block; font-weight: 400; color: var(--muted); }
 .wg-cell { background: var(--surface); border-radius: 10px; padding: 6px 4px; text-align: center; min-height: 40px; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-variant-numeric: tabular-nums; }
 .wg-cell.mine { background: #e8f2ff; color: #004a99; font-weight: 600; }
-.wg-cell.live { box-shadow: inset 0 0 0 2px var(--blue); }
+.wg-cell.live { box-shadow: inset 0 0 0 2.5px var(--orange); }
 .wg-cell.empty { color: var(--muted); }
 .day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
 .day-head h3 { margin: 0; font-size: 1.05rem; }
