@@ -1,15 +1,9 @@
 const WIDTH = 1080;
 const HEIGHT = 1350;
 const MARGIN = 64;
+const LABEL_WIDTH = 210;
+const GAP = 14;
 const FONT = '"SF Pro Display", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-const MAX_AREAS = 3;
-
-function fit(ctx, text, maxWidth) {
-  if (ctx.measureText(text).width <= maxWidth) return text;
-  let shortened = text;
-  while (shortened.length > 1 && ctx.measureText(`${shortened}…`).width > maxWidth) shortened = shortened.slice(0, -1);
-  return `${shortened.trimEnd()}…`;
-}
 
 function roundRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
@@ -21,13 +15,20 @@ function roundRect(ctx, x, y, width, height, radius) {
   ctx.closePath();
 }
 
-// Draws the plan of one day as a picture that can be posted on a story or in a group chat.
-export function renderPlanImage({ title, day, items, footer, more }) {
+function fit(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let shortened = text;
+  while (shortened.length > 1 && ctx.measureText(`${shortened}…`).width > maxWidth) shortened = shortened.slice(0, -1);
+  return `${shortened.trimEnd()}…`;
+}
+
+// The week grid (one row per day, one column per zone) as a picture for a story or a group chat.
+export function renderWeekImage({ title, heading, heads, rows, footer }) {
   const canvas = document.createElement('canvas');
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const ctx = canvas.getContext('2d');
-  const inner = WIDTH - MARGIN * 2;
+  const columnWidth = (WIDTH - MARGIN * 2 - LABEL_WIDTH - GAP * heads.length) / heads.length;
 
   const background = ctx.createLinearGradient(0, 0, 0, HEIGHT);
   background.addColorStop(0, '#e8f2ff');
@@ -37,58 +38,60 @@ export function renderPlanImage({ title, day, items, footer, more }) {
 
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#0071e3';
-  ctx.font = `600 38px ${FONT}`;
-  ctx.fillText(title.toUpperCase(), MARGIN, 120);
+  ctx.font = `600 36px ${FONT}`;
+  ctx.fillText(fit(ctx, title.toUpperCase(), WIDTH - MARGIN * 2), MARGIN, 118);
   ctx.fillStyle = '#1d1d1f';
   ctx.font = `700 78px ${FONT}`;
-  ctx.fillText(fit(ctx, day, inner), MARGIN, 216);
+  ctx.fillText(fit(ctx, heading, WIDTH - MARGIN * 2), MARGIN, 214);
 
-  const footerHeight = 150;
-  const gap = 24;
-  let y = 276;
-  const available = HEIGHT - footerHeight - y;
-  const rows = items.map(item => ({ item, areas: item.areas.slice(0, MAX_AREAS), extra: Math.max(0, item.areas.length - MAX_AREAS) }));
-  const natural = rows.map(row => 150 + (row.areas.length + (row.extra ? 1 : 0)) * 46);
-  const scale = Math.min(1, (available - gap * (rows.length - 1)) / natural.reduce((total, height) => total + height, 0));
-
-  rows.forEach((row, index) => {
-    const height = natural[index] * scale;
+  const headTop = 262;
+  heads.forEach((head, index) => {
+    const x = MARGIN + LABEL_WIDTH + GAP + index * (columnWidth + GAP);
+    ctx.fillStyle = head.color;
+    roundRect(ctx, x, headTop, columnWidth, 64, 18);
+    ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.10)';
-    ctx.shadowBlur = 28;
-    ctx.shadowOffsetY = 8;
-    roundRect(ctx, MARGIN, y, inner, height, 36);
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.fillStyle = row.item.color;
-    roundRect(ctx, MARGIN, y, 18, height, 9);
-    ctx.fill();
-
-    ctx.fillStyle = '#1d1d1f';
-    ctx.font = `700 ${Math.round(52 * Math.max(scale, 0.8))}px ${FONT}`;
-    ctx.fillText(row.item.zone, MARGIN + 54, y + 74 * Math.max(scale, 0.8));
-    ctx.textAlign = 'right';
-    ctx.fillStyle = row.item.color;
-    ctx.fillText(fit(ctx, row.item.window, inner * 0.6), MARGIN + inner - 40, y + 74 * Math.max(scale, 0.8));
+    ctx.font = `700 34px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(head.label, x + columnWidth / 2, headTop + 44);
     ctx.textAlign = 'left';
+  });
 
-    ctx.fillStyle = '#515154';
-    ctx.font = `400 ${Math.round(32 * Math.max(scale, 0.85))}px ${FONT}`;
-    let lineY = y + 128 * Math.max(scale, 0.8);
-    for (const area of row.areas) {
-      ctx.fillText(fit(ctx, area, inner - 110), MARGIN + 54, lineY);
-      lineY += 46 * Math.max(scale, 0.85);
-    }
-    if (row.extra) {
-      ctx.fillStyle = '#86868b';
-      ctx.fillText(more(row.extra), MARGIN + 54, lineY);
-    }
-    y += height + gap;
+  const top = headTop + 64 + GAP;
+  const bottom = HEIGHT - 140;
+  const rowHeight = (bottom - top - GAP * (rows.length - 1)) / rows.length;
+  rows.forEach((row, rowIndex) => {
+    const y = top + rowIndex * (rowHeight + GAP);
+    ctx.fillStyle = '#1d1d1f';
+    ctx.font = `700 32px ${FONT}`;
+    ctx.fillText(fit(ctx, row.day, LABEL_WIDTH - 12), MARGIN, y + rowHeight / 2 - 2);
+    ctx.fillStyle = '#86868b';
+    ctx.font = `500 28px ${FONT}`;
+    ctx.fillText(row.date, MARGIN, y + rowHeight / 2 + 34);
+
+    row.cells.forEach((windows, index) => {
+      const x = MARGIN + LABEL_WIDTH + GAP + index * (columnWidth + GAP);
+      ctx.fillStyle = windows.length > 0 ? '#ffffff' : 'rgba(0, 0, 0, 0.05)';
+      ctx.shadowColor = windows.length > 0 ? 'rgba(0, 0, 0, 0.10)' : 'transparent';
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 4;
+      roundRect(ctx, x, y, columnWidth, rowHeight, 22);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = windows.length > 0 ? '#1d1d1f' : '#86868b';
+      ctx.font = `${windows.length > 0 ? 600 : 400} ${windows.length > 1 ? 29 : 31}px ${FONT}`;
+      const lines = windows.length > 0 ? windows : ['–'];
+      const lineHeight = 38;
+      const firstLine = y + rowHeight / 2 - ((lines.length - 1) * lineHeight) / 2 + 11;
+      lines.forEach((line, lineIndex) => ctx.fillText(line, x + columnWidth / 2, firstLine + lineIndex * lineHeight));
+      ctx.textAlign = 'left';
+    });
   });
 
   ctx.fillStyle = '#86868b';
   ctx.font = `500 34px ${FONT}`;
-  ctx.fillText(fit(ctx, footer, inner), MARGIN, HEIGHT - 70);
+  ctx.fillText(fit(ctx, footer, WIDTH - MARGIN * 2), MARGIN, HEIGHT - 66);
 
   return new Promise((resolve, reject) => canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('no image'))), 'image/png'));
 }

@@ -2,7 +2,7 @@ import { initAnalytics, trackEvent } from './analytics.js';
 import { LANGUAGES, LANGUAGE_LABELS, applyStaticTexts, dayKeyOf, formatDayLabel, formatDuration, formatRelativeDay, getLanguage, local, setLanguage, t } from './i18n.js';
 import { buildIcs, downloadIcs } from './calendar.js';
 import { createZoneMap, getPosition, nearestPlaces, ZONE_COLORS } from './map.js';
-import { downloadBlob, renderPlanImage } from './share-image.js';
+import { downloadBlob, renderWeekImage } from './share-image.js';
 import { toLatin } from './translit.js';
 
 const STORAGE_KEY = 'voda-watches';
@@ -60,7 +60,12 @@ const nodes = {
   watchList: document.getElementById('watch-list'),
   watchEmpty: document.getElementById('watch-empty'),
   addDone: document.getElementById('add-done'),
-  closures: document.getElementById('closures'),
+  planNone: document.getElementById('plan-none'),
+  shareWeek: document.getElementById('share-week'),
+  zoneSheet: document.getElementById('zone-sheet'),
+  zoneSheetTitle: document.getElementById('zone-sheet-title'),
+  zoneSheetPlaces: document.getElementById('zone-sheet-places'),
+  zoneBackdrop: document.getElementById('zone-backdrop'),
   weekGrid: document.getElementById('week-grid'),
   textSizeSwitch: document.getElementById('text-size-switch'),
   locateButton: document.getElementById('locate-button'),
@@ -529,80 +534,79 @@ function renderNotices() {
   );
 }
 
-function closureArticle(closure) {
-  const now = Date.now();
-  const mine = closureMatches(closure);
-  const live = closure.start <= now && closure.end > now;
-  const past = closure.end <= now;
-  const badges = [el('span', { text: t('zone', { zone: closure.zone }), className: 'badge' })];
-  if (live) badges.push(el('span', { text: t('plan.live'), className: 'badge live' }));
-  if (mine) badges.push(el('span', { text: t('plan.mine'), className: 'badge mine' }));
-  return el('article', { className: `closure${mine ? ' mine' : ''}${past ? ' past' : ''}` }, [
-    el('div', { className: 'closure-head' }, [
-      el('span', { text: formatWindow(closure), className: 'closure-time' }),
-      el('span', { className: 'row' }, badges),
-    ]),
-    el('ul', {}, closure.lines.map(line => el('li', { text: local(line) }))),
-  ]);
+let openZone = null;
+
+function renderZoneSheet() {
+  nodes.zoneSheet.hidden = openZone === null;
+  nodes.zoneBackdrop.hidden = openZone === null;
+  if (openZone === null) return;
+  nodes.zoneSheetTitle.textContent = t('zone', { zone: openZone });
+  const places = [...(state.zonePlaces[openZone] ?? [])].sort((first, second) => first.localeCompare(second, 'sr'));
+  nodes.zoneSheetPlaces.replaceChildren(
+    ...(places.length === 0
+      ? [el('p', { text: t('zones.none'), className: 'muted' })]
+      : places.map(place =>
+          el('button', {
+            text: local(place),
+            className: 'place',
+            attrs: { type: 'button', 'aria-pressed': String(hasWatch('PLACE', place)) },
+            onClick: () => toggleWatch('PLACE', place),
+          }),
+        )),
+  );
 }
 
-function capitalize(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+function openZoneSheet(zone) {
+  openZone = zone;
+  renderZoneSheet();
+  nodes.zoneSheetTitle.setAttribute('tabindex', '-1');
+  nodes.zoneSheetTitle.focus({ preventScroll: true });
 }
 
-function areaHeadings(lines) {
-  return lines.map(line => line.split(/\s*\(/)[0].replace(/\s+/g, ' ').trim()).filter(Boolean);
+function closeZoneSheet() {
+  openZone = null;
+  renderZoneSheet();
 }
 
-async function sharePlanImage(closures, button) {
-  button.disabled = true;
+document.getElementById('zone-sheet-close').addEventListener('click', closeZoneSheet);
+nodes.zoneBackdrop.addEventListener('click', closeZoneSheet);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && openZone !== null) closeZoneSheet();
+});
+
+async function shareWeekImage() {
+  nodes.shareWeek.disabled = true;
   try {
-    const blob = await renderPlanImage({
-      title: t('img.title'),
-      day: capitalize(formatDayLabel(closures[0].start)),
-      items: closures.map(closure => ({
-        color: ZONE_COLORS[closure.zone],
-        zone: t('zone', { zone: closure.zone }),
-        window: formatWindow(closure),
-        areas: areaHeadings(closure.lines).map(local),
-      })),
-      footer: t('img.footer', { host: location.host }),
-      more: count => t('img.more', { count }),
+    const now = Date.now();
+    const rows = Array.from({ length: 7 }, (_, offset) => {
+      const day = now + offset * DAY_MS;
+      const [weekday, date] = formatDayLabel(day).split(', ');
+      return {
+        day: offset === 0 ? t('day.today') : offset === 1 ? t('day.tomorrow') : weekday,
+        date,
+        cells: ZONE_NAMES.map(zone => closuresOnDay(state.plan.closures.filter(closure => closure.zone === zone), offset, now).map(compactWindow)),
+      };
     });
-    const file = new File([blob], 'voda-plan.png', { type: 'image/png' });
+    const blob = await renderWeekImage({
+      title: t('img.title'),
+      heading: t('plan.week'),
+      heads: ZONE_NAMES.map(zone => ({ label: t('zone', { zone }), color: ZONE_COLORS[zone] })),
+      rows,
+      footer: t('img.footer', { host: location.host }),
+    });
+    const file = new File([blob], 'voda-sedmica.png', { type: 'image/png' });
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: t('app.title'), url: location.origin }).catch(() => undefined);
     } else {
-      downloadBlob(blob, 'voda-plan.png');
+      downloadBlob(blob, 'voda-sedmica.png');
     }
     trackEvent('share_image');
   } finally {
-    button.disabled = false;
+    nodes.shareWeek.disabled = false;
   }
 }
 
-function renderClosures() {
-  const now = Date.now();
-  const visible = state.plan.closures.filter(closure => closure.end > now - 6 * 60 * 60 * 1000);
-  if (visible.length === 0) {
-    nodes.closures.replaceChildren(el('p', { text: t('plan.none'), className: 'muted' }));
-    return;
-  }
-  const days = new Map();
-  for (const closure of visible) {
-    const key = dayKeyOf(closure.start);
-    days.set(key, [...(days.get(key) ?? []), closure]);
-  }
-  nodes.closures.replaceChildren(
-    ...[...days.values()].flatMap(items => [
-      el('div', { className: 'day-head' }, [
-        el('h3', { text: dayHeading(items[0].start) }),
-        linkButton(t('plan.shareImage'), event => sharePlanImage(items, event.currentTarget)),
-      ]),
-      ...items.map(closureArticle),
-    ]),
-  );
-}
+nodes.shareWeek.addEventListener('click', shareWeekImage);
 
 function compactWindow(closure) {
   return `${timeFormat.format(closure.start)}–${endTimeText(closure)}`;
@@ -632,7 +636,12 @@ function windowsCell(closures, now, extraClass = '') {
 // One row per day, one column per zone: a quick look at when it is a good day to do the laundry.
 function renderWeekGrid() {
   const now = Date.now();
-  const cells = [el('span'), ...ZONE_NAMES.map(zone => el('span', { text: t('zone', { zone }), className: 'wg-head' }))];
+  nodes.planNone.hidden = state.plan.closures.length > 0;
+  nodes.planNone.textContent = t('plan.none');
+  const cells = [
+    el('span'),
+    ...ZONE_NAMES.map(zone => el('button', { text: t('zone', { zone }), className: 'wg-head', attrs: { type: 'button' }, onClick: () => openZoneSheet(zone) })),
+  ];
   for (let offset = 0; offset < 7; offset += 1) {
     cells.push(dayCellLabel(offset, now + offset * DAY_MS));
     for (const zone of ZONE_NAMES) {
@@ -642,12 +651,50 @@ function renderWeekGrid() {
   nodes.weekGrid.replaceChildren(...cells);
 }
 
-// The same grid for one street or zone: the seven days and the hours without water.
+function minutesOfDay(epochMs) {
+  const [hours, minutes] = timeFormat.format(epochMs).split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// The stretches of one day (in minutes since midnight) without water, including the end of an outage that began the evening before.
+function daySegments(closures, key, now) {
+  const segments = [];
+  for (const closure of closures) {
+    const live = closure.start <= now && closure.end > now;
+    const endsThatDay = dayKeyOf(closure.end - 1) === key;
+    if (dayKeyOf(closure.start) === key) {
+      segments.push({ from: minutesOfDay(closure.start), to: endsThatDay ? minutesOfDay(closure.end) || 1440 : 1440, live });
+    } else if (endsThatDay) {
+      segments.push({ from: 0, to: minutesOfDay(closure.end) || 1440, live });
+    }
+  }
+  return segments;
+}
+
+function dayBar(segments) {
+  const bar = el('div', { className: 'wg-bar', attrs: { 'aria-hidden': 'true' } });
+  for (const segment of segments) {
+    const mark = el('span', { className: `wg-seg${segment.live ? ' live' : ''}` });
+    mark.style.left = `${(segment.from / 1440) * 100}%`;
+    mark.style.width = `${((segment.to - segment.from) / 1440) * 100}%`;
+    bar.append(mark);
+  }
+  return bar;
+}
+
+// The same grid for one street or zone: the seven days, the hours without water as text and as a bar over the 24 hours.
 function watchGrid(closures) {
   const now = Date.now();
   const cells = [];
   for (let offset = 0; offset < 7; offset += 1) {
-    cells.push(dayCellLabel(offset, now + offset * DAY_MS), windowsCell(closuresOnDay(closures, offset, now), now, ' row'));
+    const day = now + offset * DAY_MS;
+    const key = dayKeyOf(day);
+    const items = closuresOnDay(closures, offset, now);
+    const times = el('div', { className: 'wg-times' }, items.length === 0 ? [el('span', { text: '–' })] : items.map(closure => el('span', { text: compactWindow(closure) })));
+    cells.push(
+      dayCellLabel(offset, day),
+      el('span', { className: `wg-cell row${items.length === 0 ? ' empty' : ''}` }, items.length === 0 ? [times] : [times, dayBar(daySegments(closures, key, now))]),
+    );
   }
   return el('div', { className: 'week-grid single' }, cells);
 }
@@ -675,7 +722,7 @@ function renderAll() {
   renderMenuValues();
   renderWatchList();
   renderNotices();
-  renderClosures();
+  renderZoneSheet();
   renderWeekGrid();
   renderAlertsState();
   renderInstallButton();

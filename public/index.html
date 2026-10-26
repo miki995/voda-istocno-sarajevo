@@ -171,10 +171,13 @@
       <h2 data-i18n="menu.plan">Cijeli plan redukcije</h2>
     </header>
     <div class="panel">
-      <h3 data-i18n="plan.week">Sedmica unaprijed</h3>
+      <div class="day-head">
+        <h3 data-i18n="plan.week">Sedmica unaprijed</h3>
+        <button id="share-week" class="link-btn" type="button" data-i18n="plan.shareImage">Podijeli sliku</button>
+      </div>
       <p class="muted" data-i18n="plan.gridHelp">Crveno su termini za tvoje ulice.</p>
+      <p id="plan-none" class="muted" hidden></p>
       <div id="week-grid" class="week-grid"></div>
-      <div id="closures"></div>
     </div>
   </section>
 
@@ -195,6 +198,14 @@
     </div>
   </section>
 
+
+  <div id="zone-backdrop" class="backdrop" hidden></div>
+  <aside id="zone-sheet" class="sheet tall" role="dialog" aria-labelledby="zone-sheet-title" hidden>
+    <h2 id="zone-sheet-title"></h2>
+    <p class="muted" data-i18n="zones.sheetHelp">Dodirni ulicu da je dodaš u svoje.</p>
+    <div id="zone-sheet-places" class="place-list"></div>
+    <div class="row"><button id="zone-sheet-close" class="btn" type="button" data-i18n="sheet.close">Zatvori</button></div>
+  </aside>
 
   <aside id="install-sheet" class="sheet" role="dialog" aria-labelledby="install-title" hidden>
     <h2 id="install-title" data-i18n="install.title">Dodaj na početni ekran</h2>
