@@ -7,7 +7,7 @@ import { toLatin } from './translit.js';
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
-const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'zones', 'map'];
+const SCREENS = ['home', 'menu', 'add', 'alerts', 'notices', 'plan', 'map', 'settings'];
 const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
 const TEXT_KEY = 'voda-text';
 const STALE_SOURCE_MS = 3 * 60 * 60 * 1000;
@@ -69,7 +69,6 @@ const nodes = {
   mapLegend: document.getElementById('map-legend'),
   mapMessage: document.getElementById('map-message'),
   mapLocate: document.getElementById('map-locate'),
-  zones: document.getElementById('zones'),
 };
 
 function fold(value) {
@@ -563,35 +562,6 @@ function renderClosures() {
   );
 }
 
-function renderZones() {
-  const openZones = new Set([...nodes.zones.querySelectorAll('details[open]')].map(details => details.dataset.zone));
-  nodes.zones.replaceChildren(
-    ...ZONE_NAMES.map(zone => {
-      const places = state.zonePlaces[zone] ?? [];
-      const details = el('details', { className: 'zone-block', attrs: { 'data-zone': zone } }, [
-        el('summary', {}, [
-          el('span', { text: t('zone', { zone }) }),
-          el('span', { text: t('zones.count', { count: places.length }), className: 'count' }),
-        ]),
-        el(
-          'div',
-          { className: 'place-list' },
-          places.map(place =>
-            el('button', {
-              text: local(place),
-              className: 'place',
-              attrs: { type: 'button', 'aria-pressed': String(hasWatch('PLACE', place)) },
-              onClick: () => toggleWatch('PLACE', place),
-            }),
-          ),
-        ),
-      ]);
-      details.open = openZones.has(zone);
-      return details;
-    }),
-  );
-}
-
 function renderUpdated() {
   if (state.planLoadFailed) {
     nodes.updated.textContent = t('plan.loadFailed');
@@ -617,7 +587,6 @@ function renderAll() {
   renderWatchList();
   renderNotices();
   renderClosures();
-  renderZones();
   renderAlertsState();
 }
 
