@@ -465,3 +465,11 @@ button.wg-head { border-radius: 0; text-decoration: none; padding: 6px 2px 5px; 
   .art .bubble, .art .spark { opacity: 0.8; }
   .art .tear { opacity: 1; }
 }
+
+a.menu-row { text-decoration: none; color: inherit; }
+a.menu-row:active { background: rgba(0, 0, 0, 0.06); }
+.menu-label small { display: block; margin-top: 2px; font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+.section-title { margin: 26px 4px 8px; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.contact-list { margin-top: 14px; }
+
+.sources-help { margin: 4px 4px 14px; }

@@ -10,7 +10,7 @@ import { toLatin } from './translit.js';
 const STORAGE_KEY = 'voda-watches';
 const ZONE_NAMES = ['I', 'II', 'III'];
 const TIME_ZONE = 'Europe/Sarajevo';
-const SCREENS = ['home', 'menu', 'add', 'notices', 'plan', 'map', 'settings', 'contact'];
+const SCREENS = ['home', 'menu', 'add', 'notices', 'plan', 'map', 'settings', 'contact', 'sources'];
 const TEXT_SIZES = { normal: 'A', large: 'A+', xlarge: 'A++' };
 const TEXT_KEY = 'voda-text';
 const CRON_SILENT_MS = 60 * 60 * 1000;

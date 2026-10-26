@@ -13,7 +13,7 @@ const CYRILLIC_TO_LATIN = {
 const LATIN_PATTERN = /lj|nj|dž|[a-zčćđšž]/giu;
 const CYRILLIC_PATTERN = /[Ѐ-ӿ]/gu;
 // Zone and housing-block numerals ("Zona II", "Dobrinja IV") and product names stay in Latin letters in Cyrillic text too.
-const ROMAN_NUMERAL = /(?<![\p{L}\d])(?:[IVX]+|iPhone|Safari|Chrome|Instagram|Facebook|Viber)(?![\p{L}\d])/gu;
+const ROMAN_NUMERAL = /(?<![\p{L}\d])(?:[IVX]+|iPhone|Safari|Chrome|Instagram|Facebook|Viber|OpenStreetMap|vikis\.info)(?![\p{L}\d])/gu;
 
 function matchCase(source, converted) {
   return source[0] === source[0].toLowerCase() ? converted : converted.toUpperCase();
